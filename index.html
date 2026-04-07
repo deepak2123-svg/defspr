@@ -3,104 +3,6 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script>
-
-  /* ════════════════════════════════════
-   AUTH — Supabase Login / Signup
-════════════════════════════════════ */
-let currentUser = null;
-let authMode = 'signin'; // 'signin' or 'signup'
-
-function openAuth() {
-  const modal = document.getElementById('auth-modal');
-  if (modal) { modal.style.display = 'flex'; }
-}
-function closeAuth() {
-  const modal = document.getElementById('auth-modal');
-  if (modal) { modal.style.display = 'none'; }
-  clearAuthMsg();
-}
-function toggleAuthMode() {
-  authMode = authMode === 'signin' ? 'signup' : 'signin';
-  document.getElementById('auth-title').textContent   = authMode === 'signin' ? 'Sign In' : 'Create Account';
-  document.getElementById('auth-btn').textContent     = authMode === 'signin' ? 'Sign In' : 'Create Account';
-  document.getElementById('auth-switch-text').textContent = authMode === 'signin' ? 'No account?' : 'Already have one?';
-  document.getElementById('auth-switch-btn').textContent  = authMode === 'signin' ? 'Create one' : 'Sign in';
-  clearAuthMsg();
-}
-function showAuthMsg(msg, isError) {
-  const el = document.getElementById('auth-msg');
-  el.textContent = msg;
-  el.style.display = 'block';
-  el.style.background = isError ? '#fde8e0' : '#d4edda';
-  el.style.color = isError ? 'var(--accent)' : '#2d6a4f';
-}
-function clearAuthMsg() {
-  const el = document.getElementById('auth-msg');
-  if (el) { el.style.display = 'none'; el.textContent = ''; }
-}
-
-async function handleAuth() {
-  const email    = document.getElementById('auth-email').value.trim();
-  const password = document.getElementById('auth-password').value;
-  const btn      = document.getElementById('auth-btn');
-
-  if (!email || !password) { showAuthMsg('Please enter email and password.', true); return; }
-  if (password.length < 6) { showAuthMsg('Password must be at least 6 characters.', true); return; }
-
-  btn.textContent = 'Please wait...';
-  btn.disabled = true;
-
-  try {
-    let result;
-    if (authMode === 'signup') {
-      result = await _supabase.auth.signUp({ email, password });
-      if (result.error) throw result.error;
-      showAuthMsg('Account created! Check your email to confirm, then sign in.', false);
-    } else {
-      result = await _supabase.auth.signInWithPassword({ email, password });
-      if (result.error) throw result.error;
-      closeAuth();
-    }
-  } catch(err) {
-    showAuthMsg(err.message || 'Something went wrong. Try again.', true);
-  } finally {
-    btn.textContent = authMode === 'signin' ? 'Sign In' : 'Create Account';
-    btn.disabled = false;
-  }
-}
-
-async function signOut() {
-  await _supabase.auth.signOut();
-}
-
-function updateUserUI(user) {
-  currentUser = user;
-  const loginBtn  = document.getElementById('login-btn');
-  const userInfo  = document.getElementById('user-info');
-  const emailDisp = document.getElementById('user-email-display');
-  if (user) {
-    if (loginBtn)  loginBtn.style.display  = 'none';
-    if (userInfo)  userInfo.style.display  = 'flex';
-    if (emailDisp) emailDisp.textContent   = user.email;
-  } else {
-    if (loginBtn)  loginBtn.style.display  = 'block';
-    if (userInfo)  userInfo.style.display  = 'none';
-  }
-}
-
-  const _supabase = supabase.createClient(
-    'https://mhurviuuvcmgnurxulhe.supabase.co',
-    'sb_publishable__cqJGaePXam9iAawLTnd5A_a3uw0VAz'
-  );
-
-// Listen for login/logout events automatically
-_supabase.auth.onAuthStateChange(function(event, session) {
-  updateUserUI(session ? session.user : null);
-});
-</script>
   <title>DefenceSprouts — NDA Preparation</title>
   <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Cinzel:wght@600&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet"/>
   <style>
@@ -918,19 +820,6 @@ _supabase.auth.onAuthStateChange(function(event, session) {
 
     </li>
   </ul>
-  <div id="user-status">
-    <button onclick="openAuth()" id="login-btn"
-      style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;padding:.5rem 1rem;background:var(--olive);color:var(--white);border:none;cursor:pointer;">
-      Sign In
-    </button>
-    <div id="user-info" style="display:none;align-items:center;gap:.6rem;">
-      <span id="user-email-display" style="font-family:'DM Mono',monospace;font-size:.62rem;color:var(--olive);"></span>
-      <button onclick="signOut()"
-        style="font-family:'DM Mono',monospace;font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;padding:.5rem 1rem;background:none;border:1.5px solid var(--olive);color:var(--olive);cursor:pointer;">
-        Sign Out
-      </button>
-    </div>
-  </div>
 </nav>
 
 <!-- HERO -->
@@ -2681,46 +2570,49 @@ _supabase.auth.onAuthStateChange(function(event, session) {
      PYP DATA & RENDER
   ════════════════════════════════════════════════════ */
   const PYP_DATA = [
-    {exam:'NDA',year:2025,session:'I', paper:'Mathematics',tags:['300 marks','120 Qs','2.5 hrs'],pdf:'#',available:true},
-    {exam:'NDA',year:2025,session:'I', paper:'GAT',        tags:['600 marks','150 Qs','2.5 hrs'],pdf:'#',available:true},
-    {exam:'NDA',year:2024,session:'II',paper:'Mathematics',tags:['300 marks','120 Qs'],pdf:'#',available:true},
-    {exam:'NDA',year:2024,session:'II',paper:'GAT',        tags:['600 marks','150 Qs'],pdf:'#',available:true},
-    {exam:'NDA',year:2024,session:'I', paper:'Mathematics',tags:['300 marks','120 Qs'],pdf:'#',available:true},
-    {exam:'NDA',year:2024,session:'I', paper:'GAT',        tags:['600 marks','150 Qs'],pdf:'#',available:true},
-    {exam:'NDA',year:2023,session:'II',paper:'Mathematics',tags:['300 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2023,session:'II',paper:'GAT',        tags:['600 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2023,session:'I', paper:'Mathematics',tags:['300 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2023,session:'I', paper:'GAT',        tags:['600 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2022,session:'II',paper:'Mathematics',tags:['300 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2022,session:'II',paper:'GAT',        tags:['600 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2022,session:'I', paper:'Mathematics',tags:['300 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2022,session:'I', paper:'GAT',        tags:['600 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2021,session:'II',paper:'Mathematics',tags:['300 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2021,session:'II',paper:'GAT',        tags:['600 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2020,session:'I', paper:'Mathematics',tags:['300 marks'],pdf:'#',available:true},
-    {exam:'NDA',year:2020,session:'I', paper:'GAT',        tags:['600 marks'],pdf:'#',available:true},
-    {exam:'CDS',year:2025,session:'I', paper:'English',    tags:['100 marks','120 Qs'],pdf:'#',available:true},
-    {exam:'CDS',year:2025,session:'I', paper:'GK',         tags:['100 marks','120 Qs'],pdf:'#',available:true},
-    {exam:'CDS',year:2025,session:'I', paper:'Mathematics',tags:['100 marks','100 Qs'],pdf:'#',available:true},
-    {exam:'CDS',year:2024,session:'II',paper:'English',    tags:['100 marks'],pdf:'#',available:true},
-    {exam:'CDS',year:2024,session:'II',paper:'GK',         tags:['100 marks'],pdf:'#',available:true},
-    {exam:'CDS',year:2024,session:'II',paper:'Mathematics',tags:['100 marks'],pdf:'#',available:true},
-    {exam:'CDS',year:2023,session:'II',paper:'English',    tags:['100 marks','120 Qs'],pdf:'#',available:true},
-    {exam:'CDS',year:2023,session:'II',paper:'GK',         tags:['100 marks','120 Qs'],pdf:'#',available:true},
-    {exam:'CDS',year:2023,session:'II',paper:'Mathematics',tags:['100 marks','100 Qs'],pdf:'#',available:true},
-    {exam:'CDS',year:2023,session:'I', paper:'English',    tags:['100 marks','120 Qs'],pdf:'#',available:true},
-    {exam:'CDS',year:2023,session:'I', paper:'GK',         tags:['100 marks','120 Qs'],pdf:'#',available:true},
-    {exam:'CDS',year:2023,session:'I', paper:'Mathematics',tags:['100 marks','100 Qs'],pdf:'#',available:true},
-    {exam:'CDS',year:2022,session:'II',paper:'English',    tags:['100 marks'],pdf:'#',available:true},
-    {exam:'CDS',year:2022,session:'II',paper:'GK',         tags:['100 marks'],pdf:'#',available:true},
-    {exam:'CDS',year:2022,session:'II',paper:'Mathematics',tags:['100 marks'],pdf:'#',available:true},
-    {exam:'AFCAT',year:2025,session:'01',paper:'Full',tags:['300 marks','100 Qs','2 hrs'],pdf:'#',available:true},
-    {exam:'AFCAT',year:2025,session:'02',paper:'Full',tags:['300 marks'],pdf:'#',available:true},
-    {exam:'AFCAT',year:2024,session:'01',paper:'Full',tags:['300 marks'],pdf:'#',available:true},
-    {exam:'AFCAT',year:2024,session:'02',paper:'Full',tags:['300 marks'],pdf:'#',available:true},
-    {exam:'CAPF', year:2024,session:'—', paper:'Full',tags:['Paper I+II','450 marks'],pdf:'#',available:true},
-    {exam:'CAPF', year:2023,session:'—', paper:'Full',tags:['Paper I+II'],pdf:'#',available:true},
-    {exam:'CAPF', year:2022,session:'—', paper:'Full',tags:['Paper I+II'],pdf:'#',available:false},
+    {exam:'NDA',year:2025,session:'I', paper:'Mathematics',tags:['300 marks','120 Qs','2.5 hrs'],pdf:'#',available:false},
+    {exam:'NDA',year:2025,session:'I', paper:'GAT',        tags:['600 marks','150 Qs','2.5 hrs'],pdf:'#',available:false},
+    {exam:'NDA',year:2024,session:'II',paper:'Mathematics',tags:['300 marks','120 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-II-24-Maths.pdf',available:true},
+    {exam:'NDA',year:2024,session:'II',paper:'GAT',        tags:['600 marks','150 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-II-24-GAT.pdf',available:true},
+    {exam:'NDA',year:2024,session:'I', paper:'Mathematics',tags:['300 marks','120 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-I-24-Maths.pdf',available:true},
+    {exam:'NDA',year:2024,session:'I', paper:'GAT',        tags:['600 marks','150 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-I-24-GAT.pdf',available:true},
+    {exam:'NDA',year:2023,session:'II',paper:'Mathematics',tags:['300 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-II-23-Maths.pdf',available:true},
+    {exam:'NDA',year:2023,session:'II',paper:'GAT',        tags:['600 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-II-23-GAT.pdf',available:true},
+    {exam:'NDA',year:2023,session:'I', paper:'Mathematics',tags:['300 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-I-23-Maths.pdf',available:true},
+    {exam:'NDA',year:2023,session:'I', paper:'GAT',        tags:['600 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-I-23-GAT.pdf',available:true},
+    {exam:'NDA',year:2022,session:'II',paper:'Mathematics',tags:['300 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-II-22-Maths.pdf',available:true},
+    {exam:'NDA',year:2022,session:'II',paper:'GAT',        tags:['600 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-II-22-GAT.pdf',available:true},
+    {exam:'NDA',year:2022,session:'I', paper:'Mathematics',tags:['300 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-I-22-Maths.pdf',available:true},
+    {exam:'NDA',year:2022,session:'I', paper:'GAT',        tags:['600 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-I-22-GAT.pdf',available:true},
+    {exam:'NDA',year:2021,session:'II',paper:'Mathematics',tags:['300 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-II-21-Maths.pdf',available:true},
+    {exam:'NDA',year:2021,session:'II',paper:'GAT',        tags:['600 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-II-21-GAT.pdf',available:true},
+    {exam:'NDA',year:2020,session:'I', paper:'Mathematics',tags:['300 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-I-20-Maths.pdf',available:true},
+    {exam:'NDA',year:2020,session:'I', paper:'GAT',        tags:['600 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-NDA-I-20-GAT.pdf',available:true},
+    {exam:'CDS',year:2025,session:'I', paper:'English',    tags:['100 marks','120 Qs'],pdf:'#',available:false},
+    {exam:'CDS',year:2025,session:'I', paper:'GK',         tags:['100 marks','120 Qs'],pdf:'#',available:false},
+    {exam:'CDS',year:2025,session:'I', paper:'Mathematics',tags:['100 marks','100 Qs'],pdf:'#',available:false},
+    {exam:'CDS',year:2024,session:'II',paper:'English',    tags:['100 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-II-24-English.pdf',available:true},
+    {exam:'CDS',year:2024,session:'II',paper:'GK',         tags:['100 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-II-24-GK.pdf',available:true},
+    {exam:'CDS',year:2024,session:'II',paper:'Mathematics',tags:['100 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-II-24-Maths.pdf',available:true},
+    {exam:'CDS',year:2023,session:'II',paper:'English',    tags:['100 marks','120 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-II-23-English.pdf',available:true},
+    {exam:'CDS',year:2023,session:'II',paper:'GK',         tags:['100 marks','120 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-II-23-GK.pdf',available:true},
+    {exam:'CDS',year:2023,session:'II',paper:'Mathematics',tags:['100 marks','100 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-II-23-Maths.pdf',available:true},
+    {exam:'CDS',year:2023,session:'I', paper:'English',    tags:['100 marks','120 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-I-23-English.pdf',available:true},
+    {exam:'CDS',year:2023,session:'I', paper:'GK',         tags:['100 marks','120 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-I-23-GK.pdf',available:true},
+    {exam:'CDS',year:2023,session:'I', paper:'Mathematics',tags:['100 marks','100 Qs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-I-23-Maths.pdf',available:true},
+    {exam:'CDS',year:2022,session:'II',paper:'English',    tags:['100 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-II-22-English.pdf',available:true},
+    {exam:'CDS',year:2022,session:'II',paper:'GK',         tags:['100 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-II-22-GK.pdf',available:true},
+    {exam:'CDS',year:2022,session:'II',paper:'Mathematics',tags:['100 marks'],pdf:'https://upsc.gov.in/sites/default/files/QP-CDS-II-22-Maths.pdf',available:true},
+    {exam:'AFCAT',year:2025,session:'01',paper:'Full',tags:['300 marks','100 Qs','2 hrs'],pdf:'#',available:false},
+    {exam:'AFCAT',year:2025,session:'02',paper:'Full',tags:['300 marks'],pdf:'#',available:false},
+    {exam:'AFCAT',year:2024,session:'01',paper:'Full',tags:['300 marks'],pdf:'#',available:false},
+    {exam:'AFCAT',year:2024,session:'02',paper:'Full',tags:['300 marks'],pdf:'#',available:false},
+    {exam:'CAPF', year:2024,session:'—', paper:'Paper I — GS & Intelligence',tags:['250 marks','2 hrs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CAPF-24-P1.pdf',available:true},
+    {exam:'CAPF', year:2024,session:'—', paper:'Paper II — Essay & Comprehension',tags:['200 marks','3 hrs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CAPF-24-P2.pdf',available:true},
+    {exam:'CAPF', year:2023,session:'—', paper:'Paper I — GS & Intelligence',tags:['250 marks','2 hrs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CAPF-23-P1.pdf',available:true},
+    {exam:'CAPF', year:2023,session:'—', paper:'Paper II — Essay & Comprehension',tags:['200 marks','3 hrs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CAPF-23-P2.pdf',available:true},
+    {exam:'CAPF', year:2022,session:'—', paper:'Paper I — GS & Intelligence',tags:['250 marks','2 hrs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CAPF-22-P1.pdf',available:true},
+    {exam:'CAPF', year:2022,session:'—', paper:'Paper II — Essay & Comprehension',tags:['200 marks','3 hrs'],pdf:'https://upsc.gov.in/sites/default/files/QP-CAPF-22-P2.pdf',available:true},
   ];
 
   const pypFilters = {exam:'all',year:'all',paper:'all'};
@@ -3529,46 +3421,6 @@ _supabase.auth.onAuthStateChange(function(event, session) {
     </div>
   </div>
 
-</div>
-
-<!-- AUTH MODAL -->
-<div id="auth-modal" style="display:none;position:fixed;inset:0;z-index:9999;background:rgba(0,0,0,.7);align-items:center;justify-content:center;">
-  <div style="background:var(--white);width:90%;max-width:420px;border-top:4px solid var(--olive);padding:2.5rem;">
-    
-    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.5rem;">
-      <div style="font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:.05em;color:var(--olive);" id="auth-title">Sign In</div>
-      <button onclick="closeAuth()" style="background:none;border:none;font-size:1.4rem;cursor:pointer;color:var(--muted);">✕</button>
-    </div>
-
-    <div id="auth-msg" style="display:none;padding:.75rem 1rem;margin-bottom:1rem;font-size:.8rem;font-family:'DM Mono',monospace;border-radius:2px;"></div>
-
-    <div style="display:flex;flex-direction:column;gap:.9rem;">
-      <div>
-        <label style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.4rem;">Email</label>
-        <input id="auth-email" type="email" placeholder="you@example.com"
-          style="width:100%;padding:.75rem 1rem;border:1.5px solid var(--khaki);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:.9rem;color:var(--ink);outline:none;"/>
-      </div>
-      <div>
-        <label style="font-family:'DM Mono',monospace;font-size:.6rem;letter-spacing:.14em;text-transform:uppercase;color:var(--muted);display:block;margin-bottom:.4rem;">Password</label>
-        <input id="auth-password" type="password" placeholder="minimum 6 characters"
-          style="width:100%;padding:.75rem 1rem;border:1.5px solid var(--khaki);background:var(--bg);font-family:'DM Sans',sans-serif;font-size:.9rem;color:var(--ink);outline:none;"/>
-      </div>
-    </div>
-
-    <button id="auth-btn" onclick="handleAuth()"
-      style="width:100%;margin-top:1.4rem;padding:1rem;font-family:'DM Mono',monospace;font-size:.72rem;letter-spacing:.14em;text-transform:uppercase;background:var(--olive);color:var(--white);border:none;cursor:pointer;">
-      Sign In
-    </button>
-
-    <p style="text-align:center;margin-top:1rem;font-size:.78rem;color:var(--muted);">
-      <span id="auth-switch-text">No account?</span>
-      <button onclick="toggleAuthMode()" id="auth-switch-btn"
-        style="background:none;border:none;color:var(--accent);cursor:pointer;font-size:.78rem;text-decoration:underline;font-family:'DM Sans',sans-serif;">
-        Create one
-      </button>
-    </p>
-
-  </div>
 </div>
 
 </body>
