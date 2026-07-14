@@ -11,7 +11,7 @@ service cloud.firestore {
     }
 
     function role() {
-      return signedIn() && profile().data.role;
+      return profile().data.role;
     }
 
     function isAdmin() {

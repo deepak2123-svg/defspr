@@ -1,9 +1,7 @@
 {
-  "cleanUrls": true,
-  "trailingSlash": false,
   "rewrites": [
     {
-      "source": "/((?!assets/|robots.txt|sitemap.xml).*)",
+      "source": "/(.*)",
       "destination": "/index.html"
     }
   ],
