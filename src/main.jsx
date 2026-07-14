@@ -5,15 +5,20 @@ import {
   examCatalog,
   firestoreCollections,
   ndaResources,
-  questionTypes,
   roles,
-  seedBatches,
-  seedQuestions,
-  seedTests,
   subjectCatalog
 } from "./data/catalog.js";
 import { getRoleHome, normalizeUserProfile, portalHome, portalLogin, resolveAccess } from "./lib/access.js";
-import { isFirebaseConfigured, signInWithEmail, signInWithGoogle, signOutCurrentUser, signUpWithEmail } from "./lib/firebase.js";
+import { createSeedState, replaceByUid, shouldUseFirestoreData, upsertById } from "./lib/appState.js";
+import { isFirebaseConfigured, ensureUserProfile, listenToAuth, signInWithEmail, signInWithGoogle, signOutCurrentUser, signUpWithEmail } from "./lib/firebase.js";
+import {
+  addFlagToFirestore,
+  createTestInFirestore,
+  loadFirestoreState,
+  publishQuestionsToFirestore,
+  updateUserInFirestore,
+  upsertAttemptInFirestore
+} from "./lib/firebaseRepository.js";
 import { extractTextFromFile, parseMcqText } from "./lib/parser.js";
 import { canStartAttempt, getTestDurationSeconds, scoreAttempt, shouldShowResult } from "./lib/scoring.js";
 import { loadState, saveState } from "./lib/localStore.js";
@@ -23,21 +28,15 @@ const STORE_KEY = "ledgr-test-v1";
 const USER_KEY = "ledgr-test-user-v2";
 
 function initialState() {
-  return loadState(STORE_KEY, {
-    questions: seedQuestions,
-    tests: seedTests,
-    attempts: [],
-    imports: [],
-    users: demoUsers,
-    batches: seedBatches,
-    flags: []
-  });
+  return loadState(STORE_KEY, createSeedState());
 }
 
 function App() {
   const [path, setPath] = useState(window.location.pathname);
   const [activeUser, setActiveUser] = useState(() => loadState(USER_KEY, null));
   const [state, setState] = useState(initialState);
+  const [dataStatus, setDataStatus] = useState({ mode: isFirebaseConfigured ? "firebase-ready" : "local", message: "" });
+  const remoteDataEnabled = shouldUseFirestoreData(activeUser, isFirebaseConfigured);
 
   useEffect(() => {
     const onPop = () => setPath(window.location.pathname);
@@ -47,6 +46,54 @@ function App() {
 
   useEffect(() => saveState(STORE_KEY, state), [state]);
   useEffect(() => saveState(USER_KEY, activeUser), [activeUser]);
+
+  useEffect(() => {
+    if (!isFirebaseConfigured) return undefined;
+    let unsubscribe = () => {};
+    let cancelled = false;
+
+    listenToAuth(async (firebaseUser) => {
+      if (cancelled || !firebaseUser) return;
+      try {
+        const profile = normalizeUserProfile(await ensureUserProfile(firebaseUser, "student"), "student");
+        setActiveUser((current) => current || profile);
+      } catch (error) {
+        setDataStatus({ mode: "error", message: error.message });
+      }
+    }).then((listener) => {
+      unsubscribe = listener;
+    }).catch((error) => {
+      setDataStatus({ mode: "error", message: error.message });
+    });
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!remoteDataEnabled) {
+      setDataStatus({ mode: isFirebaseConfigured ? "local-preview" : "local", message: "" });
+      return;
+    }
+
+    let cancelled = false;
+    setDataStatus({ mode: "loading", message: "Loading Firestore data..." });
+    loadFirestoreState(activeUser)
+      .then((remoteState) => {
+        if (cancelled) return;
+        setState(remoteState);
+        setDataStatus({ mode: "firebase", message: "Firestore data connected." });
+      })
+      .catch((error) => {
+        if (!cancelled) setDataStatus({ mode: "error", message: error.message });
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeUser?.uid, activeUser?.role, activeUser?.status, remoteDataEnabled]);
 
   const navigate = (to) => {
     window.history.pushState({}, "", to);
@@ -60,57 +107,73 @@ function App() {
       setState,
       navigate,
       publishQuestions(questions, source = "manual") {
+        const now = new Date().toISOString();
+        const published = questions.map((question, index) => ({
+          ...question,
+          id: question.id?.startsWith("draft-") ? `q-${Date.now()}-${index}` : question.id,
+          status: "published",
+          authorUid: activeUser?.uid || "local-preview",
+          publishedAt: now
+        }));
+        const importRecord = {
+          id: `import-${Date.now()}`,
+          createdBy: activeUser?.uid || "local-preview",
+          source,
+          status: "published",
+          confidence: 1,
+          questionCount: published.length,
+          createdAt: now
+        };
         setState((current) => {
-          const now = new Date().toISOString();
-          const published = questions.map((question, index) => ({
-            ...question,
-            id: question.id?.startsWith("draft-") ? `q-${Date.now()}-${index}` : question.id,
-            status: "published",
-            authorUid: activeUser?.uid || "local-preview",
-            publishedAt: now
-          }));
           return {
             ...current,
             questions: [...published, ...current.questions],
-            imports: [
-              {
-                id: `import-${Date.now()}`,
-                createdBy: activeUser?.uid || "local-preview",
-                source,
-                status: "published",
-                confidence: 1,
-                questionCount: published.length,
-                createdAt: now
-              },
-              ...current.imports
-            ]
+            imports: [importRecord, ...current.imports]
           };
         });
+        if (remoteDataEnabled) {
+          publishQuestionsToFirestore(published, importRecord).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
       },
       addFlag(flag) {
+        const nextFlag = { id: `flag-${Date.now()}`, createdAt: new Date().toISOString(), ...flag };
         setState((current) => ({
           ...current,
-          flags: [{ id: `flag-${Date.now()}`, createdAt: new Date().toISOString(), ...flag }, ...current.flags]
+          flags: [nextFlag, ...current.flags]
         }));
+        if (remoteDataEnabled) {
+          addFlagToFirestore(nextFlag).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
       },
       createTest(test) {
+        const nextTest = { ...test, id: `test-${Date.now()}`, status: "published", createdAt: new Date().toISOString() };
         setState((current) => ({
           ...current,
-          tests: [{ ...test, id: `test-${Date.now()}`, status: "published", createdAt: new Date().toISOString() }, ...current.tests]
+          tests: [nextTest, ...current.tests]
         }));
+        if (remoteDataEnabled) {
+          createTestInFirestore(nextTest).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
       },
       saveAttempt(attempt) {
+        const nextAttempt = { ...attempt, id: attempt.id || `attempt-${Date.now()}` };
         setState((current) => ({
           ...current,
-          attempts: [{ ...attempt, id: attempt.id || `attempt-${Date.now()}` }, ...current.attempts]
+          attempts: upsertById(current.attempts, nextAttempt)
         }));
+        if (remoteDataEnabled) {
+          upsertAttemptInFirestore(nextAttempt).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
       },
       updateUser(uid, patch) {
         setActiveUser((current) => (current?.uid === uid ? { ...current, ...patch } : current));
         setState((current) => ({
           ...current,
-          users: current.users.map((user) => (user.uid === uid ? { ...user, ...patch } : user))
+          users: replaceByUid(current.users, uid, patch)
         }));
+        if (remoteDataEnabled) {
+          updateUserInFirestore(uid, patch).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
       },
       async signOut() {
         try {
@@ -121,13 +184,16 @@ function App() {
         }
       }
     }),
-    [activeUser?.uid]
+    [activeUser?.uid, remoteDataEnabled]
   );
 
   return (
     <div className="app-shell">
       <TopBar activeUser={activeUser} actions={actions} navigate={navigate} path={path} />
-      <main className="app-main">{renderRoute(path, { state, activeUser, actions })}</main>
+      <main className="app-main">
+        <DataStatusBanner dataStatus={dataStatus} />
+        {renderRoute(path, { state, activeUser, actions, dataStatus })}
+      </main>
     </div>
   );
 }
@@ -154,6 +220,16 @@ function renderRoute(path, ctx) {
   if (path === "/admin") return <GuardedRoute path={path} ctx={ctx}><AdminDashboard {...ctx} /></GuardedRoute>;
   if (path === "/nda/resources") return <NdaResources />;
   return <Landing {...ctx} />;
+}
+
+function DataStatusBanner({ dataStatus }) {
+  if (!dataStatus?.message || dataStatus.mode === "firebase") return null;
+  return (
+    <div className={`data-status ${dataStatus.mode === "error" ? "error" : ""}`}>
+      <strong>{dataStatus.mode === "error" ? "Data sync needs attention" : "Data status"}</strong>
+      <span>{dataStatus.message}</span>
+    </div>
+  );
 }
 
 function TopBar({ activeUser, actions, navigate, path }) {
@@ -525,7 +601,8 @@ function PortalAccessMessage({ access, activeUser, actions }) {
 
 function StudentDashboard({ state, activeUser, actions }) {
   const visibleTests = getVisibleTests(state.tests, state.batches, activeUser);
-  const ownAttempts = state.attempts.filter((attempt) => attempt.studentUid === activeUser.uid);
+  const ownAttempts = state.attempts.filter((attempt) => attempt.studentUid === activeUser.uid && isSubmittedAttempt(attempt));
+  const draftAttempts = state.attempts.filter((attempt) => attempt.studentUid === activeUser.uid && isDraftAttempt(attempt));
 
   return (
     <PortalLayout title="Student Portal" subtitle="Take tests, review attempts and continue NDA practice." role="student" actions={actions}>
@@ -533,7 +610,7 @@ function StudentDashboard({ state, activeUser, actions }) {
         <Metric label="Available tests" value={visibleTests.length} />
         <Metric label="Completed attempts" value={ownAttempts.length} />
         <Metric label="Best score" value={ownAttempts.length ? Math.max(...ownAttempts.map((a) => a.score.score)) : 0} />
-        <Metric label="Assigned batches" value={activeUser.batchIds.length || "Public"} />
+        <Metric label="In progress" value={draftAttempts.length} />
       </div>
       <StudentTests state={state} activeUser={activeUser} actions={actions} embedded />
       <RecentAttempts attempts={ownAttempts} actions={actions} />
@@ -543,7 +620,7 @@ function StudentDashboard({ state, activeUser, actions }) {
 
 function StudentTests({ state, activeUser, actions, embedded = false }) {
   const visibleTests = getVisibleTests(state.tests, state.batches, activeUser);
-  const attemptsByTest = state.attempts.filter((attempt) => attempt.studentUid === activeUser.uid);
+  const attemptsByTest = state.attempts.filter((attempt) => attempt.studentUid === activeUser.uid && isSubmittedAttempt(attempt));
 
   return (
     <section className={embedded ? "block" : "page-block"}>
@@ -552,14 +629,16 @@ function StudentTests({ state, activeUser, actions, embedded = false }) {
         {visibleTests.map((test) => {
           const policy = canStartAttempt({ test, previousAttempts: attemptsByTest });
           const exam = examCatalog[test.examId];
+          const draft = state.attempts.find((attempt) => attempt.studentUid === activeUser.uid && attempt.testId === test.id && isDraftAttempt(attempt));
           return (
             <article className="test-card" key={test.id}>
               <span className="pill">{exam?.label || test.examId}</span>
               <h3>{test.title}</h3>
               <p>{test.mode} · {test.visibility} · {describeTiming(test)}</p>
               <p>{describeAttemptPolicy(test)} · results {test.resultRelease.type}</p>
-              <button className="primary" disabled={!policy.allowed} onClick={() => actions.navigate(`/student/attempt/${test.id}`)}>
-                {policy.allowed ? "Start test" : "Attempt limit reached"}
+              {draft && <p className="notice">Saved draft from {new Date(draft.updatedAt || draft.startedAt).toLocaleString()}.</p>}
+              <button className="primary" disabled={!draft && !policy.allowed} onClick={() => actions.navigate(`/student/attempt/${test.id}`)}>
+                {draft ? "Resume test" : policy.allowed ? "Start test" : "Attempt limit reached"}
               </button>
             </article>
           );
@@ -572,11 +651,20 @@ function StudentTests({ state, activeUser, actions, embedded = false }) {
 function AttemptRunner({ testId, state, activeUser, actions }) {
   const test = state.tests.find((item) => item.id === testId);
   const questions = test ? hydrateTestQuestions(test, state.questions) : [];
-  const [index, setIndex] = useState(0);
-  const [responses, setResponses] = useState({});
-  const [marked, setMarked] = useState({});
-  const [events, setEvents] = useState([]);
-  const [remaining, setRemaining] = useState(test ? getTestDurationSeconds(test) : null);
+  const existingDraft = state.attempts.find((item) => item.testId === testId && item.studentUid === activeUser.uid && isDraftAttempt(item));
+  const durationSeconds = test ? getTestDurationSeconds(test) : null;
+  const [attemptId] = useState(existingDraft?.id || `attempt-${Date.now()}`);
+  const [startedAt] = useState(existingDraft?.startedAt || new Date().toISOString());
+  const [index, setIndex] = useState(existingDraft?.currentIndex || 0);
+  const [responses, setResponses] = useState(existingDraft?.responses || {});
+  const [marked, setMarked] = useState(existingDraft?.marked || {});
+  const [events, setEvents] = useState(existingDraft?.integrityEvents || []);
+  const [remaining, setRemaining] = useState(() => {
+    if (durationSeconds === null) return null;
+    if (typeof existingDraft?.remainingSeconds === "number") return existingDraft.remainingSeconds;
+    const elapsedSeconds = Math.floor((Date.now() - new Date(startedAt).getTime()) / 1000);
+    return Math.max(0, durationSeconds - elapsedSeconds);
+  });
 
   useEffect(() => {
     if (remaining === null) return undefined;
@@ -596,7 +684,11 @@ function AttemptRunner({ testId, state, activeUser, actions }) {
   useEffect(() => {
     const onVisibility = () => {
       if (document.hidden) {
-        setEvents((current) => [...current, { type: "tab-hidden", at: new Date().toISOString() }]);
+        setEvents((current) => {
+          const nextEvents = [...current, { type: "tab-hidden", at: new Date().toISOString() }];
+          persistDraft({ nextEvents });
+          return nextEvents;
+        });
       }
     };
     document.addEventListener("visibilitychange", onVisibility);
@@ -608,27 +700,63 @@ function AttemptRunner({ testId, state, activeUser, actions }) {
 
   const question = questions[index];
 
+  function buildDraft({ nextResponses = responses, nextMarked = marked, nextEvents = events, nextIndex = index } = {}) {
+    return {
+      id: attemptId,
+      testId: test.id,
+      studentUid: activeUser.uid,
+      status: "in-progress",
+      responses: nextResponses,
+      marked: nextMarked,
+      currentIndex: nextIndex,
+      integrityEvents: nextEvents,
+      startedAt,
+      updatedAt: new Date().toISOString(),
+      remainingSeconds: remaining
+    };
+  }
+
+  function persistDraft(next = {}) {
+    if (!test) return;
+    actions.saveAttempt(buildDraft(next));
+  }
+
   function updateAnswer(questionId, value) {
-    setResponses((current) => ({ ...current, [questionId]: value }));
+    const nextResponses = { ...responses, [questionId]: value };
+    setResponses(nextResponses);
+    persistDraft({ nextResponses });
+  }
+
+  function goToQuestion(nextIndex) {
+    setIndex(nextIndex);
+    persistDraft({ nextIndex });
+  }
+
+  function toggleMarked(questionId) {
+    const nextMarked = { ...marked, [questionId]: !marked[questionId] };
+    setMarked(nextMarked);
+    persistDraft({ nextMarked });
   }
 
   function submitAttempt(reason = "submitted") {
     const score = scoreAttempt({ test, questions, responses });
-    const id = `attempt-${Date.now()}`;
     const attempt = {
-      id,
+      id: attemptId,
       testId: test.id,
       studentUid: activeUser.uid,
+      status: "submitted",
       responses,
+      marked,
       score,
       integrityEvents: events,
       submitReason: reason,
-      startedAt: new Date(Date.now() - ((getTestDurationSeconds(test) ?? 0) - (remaining ?? 0)) * 1000).toISOString(),
+      startedAt,
       submittedAt: new Date().toISOString(),
+      remainingSeconds: remaining,
       resultReleased: test.resultRelease.type === "immediate"
     };
     actions.saveAttempt(attempt);
-    setTimeout(() => actions.navigate(`/student/results/${id}`), 0);
+    setTimeout(() => actions.navigate(`/student/results/${attemptId}`), 0);
   }
 
   return (
@@ -642,7 +770,7 @@ function AttemptRunner({ testId, state, activeUser, actions }) {
             <button
               key={item.id}
               className={`${itemIndex === index ? "active" : ""} ${responses[item.id] ? "answered" : ""} ${marked[item.id] ? "marked" : ""}`}
-              onClick={() => setIndex(itemIndex)}
+              onClick={() => goToQuestion(itemIndex)}
             >
               {itemIndex + 1}
             </button>
@@ -654,15 +782,15 @@ function AttemptRunner({ testId, state, activeUser, actions }) {
       <section className="question-panel">
         <div className="question-topline">
           <span>Question {index + 1} of {questions.length}</span>
-          <button className="ghost" onClick={() => setMarked((current) => ({ ...current, [question.id]: !current[question.id] }))}>
+          <button className="ghost" onClick={() => toggleMarked(question.id)}>
             {marked[question.id] ? "Unmark" : "Mark for review"}
           </button>
         </div>
         <RichText html={question.stemHtml} />
         <AnswerControl question={question} value={responses[question.id]} onChange={(value) => updateAnswer(question.id, value)} />
         <div className="question-actions">
-          <button className="secondary" disabled={index === 0} onClick={() => setIndex(index - 1)}>Previous</button>
-          <button className="primary" disabled={index === questions.length - 1} onClick={() => setIndex(index + 1)}>Save and next</button>
+          <button className="secondary" disabled={index === 0} onClick={() => goToQuestion(index - 1)}>Previous</button>
+          <button className="primary" disabled={index === questions.length - 1} onClick={() => goToQuestion(index + 1)}>Save and next</button>
         </div>
       </section>
     </section>
@@ -670,7 +798,8 @@ function AttemptRunner({ testId, state, activeUser, actions }) {
 }
 
 function ResultView({ attemptId, state, activeUser, actions }) {
-  const attempt = state.attempts.find((item) => item.id === attemptId) || state.attempts[0];
+  const submittedAttempts = state.attempts.filter(isSubmittedAttempt);
+  const attempt = submittedAttempts.find((item) => item.id === attemptId) || submittedAttempts[0];
   if (!attempt) return <Missing title="No attempt found" />;
   const test = state.tests.find((item) => item.id === attempt.testId);
   const questions = test ? hydrateTestQuestions(test, state.questions) : [];
@@ -848,7 +977,7 @@ function AdminDashboard({ state, actions }) {
       <div className="metric-strip">
         <Metric label="Questions" value={state.questions.length} />
         <Metric label="Tests" value={state.tests.length} />
-        <Metric label="Attempts" value={state.attempts.length} />
+        <Metric label="Submitted attempts" value={state.attempts.filter(isSubmittedAttempt).length} />
         <Metric label="Flags" value={state.flags.length} />
       </div>
       <div className="schema-grid">
@@ -962,13 +1091,14 @@ function AdminTests({ state, actions }) {
 }
 
 function AdminResults({ state }) {
-  const csv = buildAttemptsCsv(state.attempts, state.tests, state.users);
+  const submittedAttempts = state.attempts.filter(isSubmittedAttempt);
+  const csv = buildAttemptsCsv(submittedAttempts, state.tests, state.users);
   return (
     <section className="page-block">
       <PageTitle eyebrow="Admin results" title="Attempts, analytics and CSV export." />
       <a className="primary link-button" download="ledgr-test-attempts.csv" href={`data:text/csv;charset=utf-8,${encodeURIComponent(csv)}`}>Export CSV</a>
       <div className="review-list">
-        {state.attempts.map((attempt) => {
+        {submittedAttempts.map((attempt) => {
           const test = state.tests.find((item) => item.id === attempt.testId);
           const user = state.users.find((item) => item.uid === attempt.studentUid);
           return (
@@ -1192,6 +1322,14 @@ function describeTiming(test) {
 function describeAttemptPolicy(test) {
   if (test.attemptPolicy?.type === "unlimited") return "unlimited attempts";
   return `${test.attemptPolicy?.maxAttempts || 1} attempt(s)`;
+}
+
+function isSubmittedAttempt(attempt) {
+  return attempt?.status === "submitted" || Boolean(attempt?.submittedAt);
+}
+
+function isDraftAttempt(attempt) {
+  return attempt?.status === "in-progress" && !attempt?.submittedAt;
 }
 
 function formatAnswer(value) {

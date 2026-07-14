@@ -7,10 +7,14 @@
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
     "preview": "vite preview --host 127.0.0.1",
-    "test": "vitest run"
+    "test": "vitest run",
+    "seed:firestore": "node scripts/seed-firestore.mjs",
+    "firebase:emulators": "firebase emulators:start --only auth,firestore,storage",
+    "check": "npm test && npm run build && npm audit --audit-level=moderate"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^6.0.3",
+    "firebase-admin": "^14.1.0",
     "jsdom": "^29.1.1",
     "vite": "^8.1.4",
     "vitest": "^4.1.10"
@@ -21,5 +25,8 @@
     "pdfjs-dist": "^6.1.200",
     "react": "^19.2.7",
     "react-dom": "^19.2.7"
+  },
+  "overrides": {
+    "uuid": "^11.1.1"
   }
 }

@@ -23,7 +23,7 @@ service cloud.firestore {
     }
 
     function isStudent() {
-      return signedIn() && role() == "student";
+      return signedIn() && role() == "student" && profile().data.status == "active";
     }
 
     function teacherSubjectIds() {
@@ -31,8 +31,19 @@ service cloud.firestore {
     }
 
     match /users/{uid} {
-      allow create: if signedIn() && request.auth.uid == uid;
-      allow read, update: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow create: if signedIn() &&
+        request.auth.uid == uid &&
+        request.resource.data.role in ["student", "teacher"] &&
+        (
+          (request.resource.data.role == "student" && request.resource.data.status == "active") ||
+          (request.resource.data.role == "teacher" && request.resource.data.status == "pending")
+        );
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow update: if isAdmin() || (
+        signedIn() &&
+        request.auth.uid == uid &&
+        !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "status", "batchIds", "teacherSubjectIds"])
+      );
       allow delete: if isAdmin();
     }
 
@@ -88,7 +99,13 @@ service cloud.firestore {
     match /attempts/{id} {
       allow create: if isStudent() && request.resource.data.studentUid == request.auth.uid;
       allow read: if isAdmin() || (signedIn() && resource.data.studentUid == request.auth.uid);
-      allow update: if isAdmin();
+      allow update: if isAdmin() || (
+        isStudent() &&
+        resource.data.studentUid == request.auth.uid &&
+        request.resource.data.studentUid == request.auth.uid &&
+        resource.data.status == "in-progress" &&
+        request.resource.data.status in ["in-progress", "submitted"]
+      );
       allow delete: if isAdmin();
     }
 

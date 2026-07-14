@@ -20,11 +20,15 @@ npm install
 npm run dev
 ```
 
+Local preview without Firebase still uses `/dev-demo`. Real auth/data testing uses Firebase env values plus the normal `/student-login`, `/teacher-login`, and `/admin-login` gateways.
+
 ## Validation
 
 ```bash
 npm test
 npm run build
+npm audit --audit-level=moderate
+npm run check
 ```
 
 ## Firebase setup
@@ -41,3 +45,24 @@ VITE_FIREBASE_APP_ID=
 ```
 
 Firestore and Storage rules live in `firestore.rules` and `storage.rules`.
+
+## Real login testing
+
+Create a separate Firebase project for Ledgr Test, then enable Auth providers:
+
+- Google
+- Email/password
+
+Add the Firebase web app values to `.env`. For emulator testing, set `VITE_USE_FIREBASE_EMULATORS=true` and run:
+
+```bash
+npm run firebase:emulators
+```
+
+Seed Firestore after setting `FIREBASE_PROJECT_ID` or `VITE_FIREBASE_PROJECT_ID` plus either `GOOGLE_APPLICATION_CREDENTIALS` or application-default Google credentials:
+
+```bash
+npm run seed:firestore
+```
+
+The seed script writes exams, subjects, chapters, initial NDA questions, the NDA diagnostic test, batches, and testing user profiles. Set `LEDGR_ADMIN_UID`, `LEDGR_ADMIN_EMAIL`, and `LEDGR_ADMIN_NAME` before seeding the real admin profile.

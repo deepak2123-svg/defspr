@@ -231,6 +231,32 @@ button:disabled {
   padding: 28px 0 56px;
 }
 
+.data-status {
+  display: flex;
+  gap: 0.7rem;
+  align-items: center;
+  margin-bottom: 1rem;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--blue);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 0.8rem 1rem;
+}
+
+.data-status strong {
+  color: var(--ink);
+  font-size: 0.86rem;
+}
+
+.data-status span {
+  color: var(--muted);
+  font-size: 0.86rem;
+}
+
+.data-status.error {
+  border-left-color: var(--danger);
+}
+
 .landing,
 .page-block {
   display: grid;
@@ -875,6 +901,11 @@ a:focus-visible {
   .session-actions {
     display: grid;
     grid-template-columns: 1fr;
+  }
+
+  .data-status {
+    align-items: flex-start;
+    flex-direction: column;
   }
 
   .session-chip {

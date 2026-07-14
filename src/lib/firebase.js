@@ -8,10 +8,12 @@ const firebaseConfig = {
 };
 
 export const isFirebaseConfigured = Object.values(firebaseConfig).every(Boolean);
+export const useFirebaseEmulators = import.meta.env.VITE_USE_FIREBASE_EMULATORS === "true";
 
 let cachedServices = null;
+let emulatorsConnected = false;
 
-async function getFirebaseServices() {
+export async function getFirebaseServices() {
   if (!isFirebaseConfigured) throw new Error("Firebase is not configured. Add the VITE_FIREBASE_* values from .env.example.");
   if (cachedServices) return cachedServices;
 
@@ -26,6 +28,23 @@ async function getFirebaseServices() {
   const auth = authModule.getAuth(app);
   const db = firestoreModule.getFirestore(app);
   const storage = storageModule.getStorage(app);
+
+  if (useFirebaseEmulators && !emulatorsConnected) {
+    authModule.connectAuthEmulator(auth, import.meta.env.VITE_FIREBASE_AUTH_EMULATOR_URL || "http://127.0.0.1:9099", {
+      disableWarnings: true
+    });
+    firestoreModule.connectFirestoreEmulator(
+      db,
+      import.meta.env.VITE_FIRESTORE_EMULATOR_HOST || "127.0.0.1",
+      Number(import.meta.env.VITE_FIRESTORE_EMULATOR_PORT || 8080)
+    );
+    storageModule.connectStorageEmulator(
+      storage,
+      import.meta.env.VITE_FIREBASE_STORAGE_EMULATOR_HOST || "127.0.0.1",
+      Number(import.meta.env.VITE_FIREBASE_STORAGE_EMULATOR_PORT || 9199)
+    );
+    emulatorsConnected = true;
+  }
 
   cachedServices = { app, auth, db, storage, authModule, firestoreModule, storageModule };
   return cachedServices;

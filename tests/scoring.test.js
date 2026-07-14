@@ -46,6 +46,7 @@ describe("scoring", () => {
   it("enforces attempt limits", () => {
     expect(canStartAttempt({ test, previousAttempts: [] }).allowed).toBe(true);
     expect(canStartAttempt({ test, previousAttempts: [{ testId: "t1" }] }).allowed).toBe(false);
+    expect(canStartAttempt({ test, previousAttempts: [{ testId: "t1", status: "in-progress" }] }).allowed).toBe(true);
   });
 
   it("calculates section timers and result release", () => {

@@ -117,7 +117,7 @@ export function canStartAttempt({ test, previousAttempts = [] }) {
   }
 
   const maxAttempts = Number(test.attemptPolicy.maxAttempts ?? 1);
-  const used = previousAttempts.filter((attempt) => attempt.testId === test.id).length;
+  const used = previousAttempts.filter((attempt) => attempt.testId === test.id && attempt.status !== "in-progress").length;
   return {
     allowed: used < maxAttempts,
     remaining: Math.max(0, maxAttempts - used)
