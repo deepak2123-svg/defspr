@@ -1,0 +1,105 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function profile() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function role() {
+      return signedIn() && profile().data.role;
+    }
+
+    function isAdmin() {
+      return signedIn() && role() == "admin";
+    }
+
+    function isTeacher() {
+      return signedIn() && role() == "teacher" && profile().data.status in ["approved", "active"];
+    }
+
+    function isStudent() {
+      return signedIn() && role() == "student";
+    }
+
+    function teacherSubjectIds() {
+      return profile().data.teacherSubjectIds == null ? [] : profile().data.teacherSubjectIds;
+    }
+
+    match /users/{uid} {
+      allow create: if signedIn() && request.auth.uid == uid;
+      allow read, update: if isAdmin() || (signedIn() && request.auth.uid == uid);
+      allow delete: if isAdmin();
+    }
+
+    match /exams/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /subjects/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /chapters/{id} {
+      allow read: if true;
+      allow write: if isAdmin();
+    }
+
+    match /questions/{id} {
+      allow read: if signedIn() && (
+        resource.data.status == "published" ||
+        isAdmin() ||
+        (isTeacher() && resource.data.subjectId in teacherSubjectIds())
+      );
+      allow create: if isAdmin() || (
+        isTeacher() &&
+        request.resource.data.authorUid == request.auth.uid &&
+        request.resource.data.subjectId in teacherSubjectIds()
+      );
+      allow update: if isAdmin() || (
+        isTeacher() &&
+        resource.data.subjectId in teacherSubjectIds() &&
+        request.resource.data.subjectId in teacherSubjectIds()
+      );
+      allow delete: if isAdmin();
+    }
+
+    match /imports/{id} {
+      allow read: if isAdmin() || (signedIn() && resource.data.createdBy == request.auth.uid);
+      allow create: if isAdmin() || (isTeacher() && request.resource.data.createdBy == request.auth.uid);
+      allow update: if isAdmin() || (isTeacher() && resource.data.createdBy == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    match /tests/{id} {
+      allow read: if signedIn() && (
+        resource.data.status == "published" ||
+        isAdmin()
+      );
+      allow write: if isAdmin();
+    }
+
+    match /attempts/{id} {
+      allow create: if isStudent() && request.resource.data.studentUid == request.auth.uid;
+      allow read: if isAdmin() || (signedIn() && resource.data.studentUid == request.auth.uid);
+      allow update: if isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    match /batches/{id} {
+      allow read: if isAdmin() || (isStudent() && request.auth.uid in resource.data.studentIds);
+      allow write: if isAdmin();
+    }
+
+    match /flags/{id} {
+      allow create: if signedIn() && request.resource.data.createdBy == request.auth.uid;
+      allow read, update, delete: if isAdmin();
+    }
+  }
+}

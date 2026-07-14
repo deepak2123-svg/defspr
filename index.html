@@ -3,129 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Defence Sprouts | Defence exam preparation</title>
+    <title>Ledgr Test | Mock test platform</title>
     <meta
       name="description"
-      content="Structured preparation for NDA, TES, CDS, AFCAT and CAPF aspirants with eligibility checks, exam patterns, SSB prep, medical standards and practice resources."
+      content="Ledgr Test is a role-based mock-test platform for NDA, NEET, JEE Main and JEE Advanced with student, teacher and admin portals."
     />
-    <meta property="og:title" content="Defence Sprouts" />
-    <meta property="og:description" content="Plan your defence entrance journey from written exam to SSB and medicals." />
+    <meta property="og:title" content="Ledgr Test" />
+    <meta property="og:description" content="Mock tests, question banks, teacher imports and analytics for competitive exam preparation." />
     <meta property="og:type" content="website" />
     <meta property="og:url" content="https://defspr.vercel.app/" />
-    <meta property="og:image" content="https://commons.wikimedia.org/wiki/Special:Redirect/file/SUDAN_Block_of_National_Defence_Academy%2C_Khadakwasla%2C_pune.jpg" />
   </head>
-  <body data-page="home" data-default-exam="nda">
-    <header data-site-header></header>
-
-    <main>
-      <section class="hero hero-home">
-        <div class="hero-copy">
-          <p class="eyebrow">NDA / TES / CDS / AFCAT / CAPF</p>
-          <h1>Prepare with a map, not guesswork.</h1>
-          <p class="hero-lede">
-            Defence Sprouts turns every entry route into a clear prep system:
-            eligibility, exam pattern, study lanes, SSB, medical standards and
-            official links in one maintained place.
-          </p>
-          <div class="hero-actions">
-            <a class="btn primary" href="/written.html">Start with written exams</a>
-            <a class="btn secondary" href="/practice.html">Open practice hub</a>
-          </div>
-        </div>
-        <figure class="hero-visual">
-          <img
-            src="https://commons.wikimedia.org/wiki/Special:Redirect/file/SUDAN_Block_of_National_Defence_Academy%2C_Khadakwasla%2C_pune.jpg"
-            alt="Sudan Block at the National Defence Academy, Khadakwasla"
-          />
-          <figcaption>
-            Sudan Block, NDA Khadakwasla. Image by Sourabh.scd, CC BY-SA 4.0.
-          </figcaption>
-          <div class="visual-stat top">
-            <strong>5</strong>
-            <span>routes covered</span>
-          </div>
-          <div class="visual-stat bottom">
-            <strong>SSB</strong>
-            <span>five day board</span>
-          </div>
-        </figure>
-      </section>
-
-      <section class="band quick-band" aria-label="Preparation pillars">
-        <div class="metric"><strong>1800</strong><span>NDA total marks</span></div>
-        <div class="metric"><strong>2x</strong><span>UPSC defence cycles yearly</span></div>
-        <div class="metric"><strong>900</strong><span>NDA SSB marks</span></div>
-        <div class="metric"><strong>1</strong><span>tracked local progress board</span></div>
-      </section>
-
-      <section class="section split">
-        <div>
-          <p class="eyebrow">Eligibility tool</p>
-          <h2>Check your entry windows before you build a timetable.</h2>
-          <p>
-            The calculator compares your age and education stream against the
-            routes this site tracks. It is intentionally plain: know if you are
-            ready, early, late or stream-mismatched.
-          </p>
-        </div>
-        <div class="tool-card" data-eligibility></div>
-      </section>
-
-      <section class="section">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Choose your route</p>
-            <h2>One brand, real pages.</h2>
-          </div>
-          <a class="text-link" href="/resources.html">View source notes</a>
-        </div>
-        <div class="feature-grid">
-          <a class="feature-card" href="/written.html">
-            <span class="card-kicker">01</span>
-            <h3>Written Exam Command Center</h3>
-            <p>Exam journeys, paper patterns, subjects and scoring focus for every tracked route.</p>
-          </a>
-          <a class="feature-card" href="/ssb.html">
-            <span class="card-kicker">02</span>
-            <h3>SSB Interview Roadmap</h3>
-            <p>Five days of screening, psychology, GTO, personal interview and conference prep.</p>
-          </a>
-          <a class="feature-card" href="/physical.html">
-            <span class="card-kicker">03</span>
-            <h3>Physical and Medical Standards</h3>
-            <p>Height, weight, vision and common rejection risks in a cleaner reference view.</p>
-          </a>
-          <a class="feature-card" href="/calendar.html">
-            <span class="card-kicker">04</span>
-            <h3>Dates and Cut-offs</h3>
-            <p>Milestone cards, status labels and benchmark cut-offs with official links.</p>
-          </a>
-          <a class="feature-card" href="/practice.html">
-            <span class="card-kicker">05</span>
-            <h3>Practice Hub</h3>
-            <p>Paper archive links, topic drills and a local progress tracker for repeat study.</p>
-          </a>
-          <a class="feature-card" href="/resources.html">
-            <span class="card-kicker">06</span>
-            <h3>Resources and Roadmap</h3>
-            <p>Official portals, image attribution, update notes and a short product roadmap.</p>
-          </a>
-        </div>
-      </section>
-
-      <section class="section surface">
-        <div class="section-head">
-          <div>
-            <p class="eyebrow">Live milestones</p>
-            <h2>What aspirants need to watch next.</h2>
-          </div>
-          <a class="btn compact" href="/calendar.html">Full calendar</a>
-        </div>
-        <div class="timeline-grid" data-calendar-preview></div>
-      </section>
-    </main>
-
-    <footer data-site-footer></footer>
-    <script type="module" src="/src/main.js"></script>
+  <body>
+    <div id="root"></div>
+    <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

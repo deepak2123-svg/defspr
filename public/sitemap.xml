@@ -1,10 +1,8 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
   <url><loc>https://defspr.vercel.app/</loc></url>
-  <url><loc>https://defspr.vercel.app/written</loc></url>
-  <url><loc>https://defspr.vercel.app/ssb</loc></url>
-  <url><loc>https://defspr.vercel.app/physical</loc></url>
-  <url><loc>https://defspr.vercel.app/calendar</loc></url>
-  <url><loc>https://defspr.vercel.app/practice</loc></url>
-  <url><loc>https://defspr.vercel.app/resources</loc></url>
+  <url><loc>https://defspr.vercel.app/student</loc></url>
+  <url><loc>https://defspr.vercel.app/teacher</loc></url>
+  <url><loc>https://defspr.vercel.app/admin</loc></url>
+  <url><loc>https://defspr.vercel.app/nda/resources</loc></url>
 </urlset>
