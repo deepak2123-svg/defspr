@@ -150,6 +150,7 @@ export function SuperAdminPortal({ state, activeUser, actions, adminScope }) {
   const activeModule = superAdminModules.find((module) => module.id === tab) || superAdminModules[0];
   const clientRows = useMemo(() => buildClientRows(adminState, billing), [adminState, billing]);
   const visibleClientRows = clientRows.filter((row) => `${row.name} ${row.meta}`.toLowerCase().includes(clientSearch.trim().toLowerCase())).slice(0, 18);
+  const teacherRecordCount = adminState.users.filter((user) => user.role === "teacher").length;
 
   if (!superAdmin) {
     return <ScopedAdminDashboard state={adminState} activeUser={activeUser} billing={billing} />;
@@ -220,9 +221,9 @@ export function SuperAdminPortal({ state, activeUser, actions, adminScope }) {
         </div>
         <div className="admin-context-cards">
           <Metric label="Institutes" value={filterInstitutes(adminState, adminScope).length} />
-          <Metric label="Groups" value={filterGroups(adminState, adminScope).length} />
-          <Metric label="Credits left" value={billing.reduce((sum, account) => sum + Number(account.remainingCredits || 0), 0)} />
-          <Metric label="Active invites" value={adminState.invites.filter((invite) => getInviteStatus(invite) === "active").length} />
+          <Metric label="Teacher records" value={teacherRecordCount} />
+          <Metric label="Loaded now" value={teacherRecordCount} />
+          <Metric label="Detail records" value={adminState.auditLogs.length} />
         </div>
         <button className="admin-context-report" onClick={() => setTab("audit")}>
           <RailIcon name="billing" />
@@ -231,7 +232,7 @@ export function SuperAdminPortal({ state, activeUser, actions, adminScope }) {
       </aside>
 
       <main className="admin-main-panel">
-        {tab === "dashboard" && <SuperAdminDashboard state={adminState} billing={billing} adminScope={adminScope} />}
+        {tab === "dashboard" && <SuperAdminDashboard state={adminState} adminScope={adminScope} teacherRecordCount={teacherRecordCount} />}
         {tab === "clients" && <ModuleSurface eyebrow="Clients" title="Groups and institutes"><ClientManager state={adminState} actions={actions} /></ModuleSurface>}
         {tab === "invites" && <ModuleSurface eyebrow="Invites" title="Admin invite links"><InviteManager state={adminState} actions={actions} /></ModuleSurface>}
         {tab === "billing" && <ModuleSurface eyebrow="Billing" title="Credit and payment ledger"><BillingManager state={adminState} actions={actions} billing={billing} /></ModuleSurface>}
@@ -241,12 +242,9 @@ export function SuperAdminPortal({ state, activeUser, actions, adminScope }) {
   );
 }
 
-function SuperAdminDashboard({ state, billing, adminScope }) {
+function SuperAdminDashboard({ state, adminScope, teacherRecordCount }) {
   const scopedInstitutes = filterInstitutes(state, adminScope);
-  const scopedGroups = filterGroups(state, adminScope);
-  const scopedBilling = filterBilling(state, adminScope, billing);
-  const remainingCredits = scopedBilling.reduce((sum, account) => sum + Number(account.remainingCredits || 0), 0);
-  const activeInvites = state.invites.filter((invite) => getInviteStatus(invite) === "active").length;
+  const loadedNow = teacherRecordCount;
 
   return (
     <section className="admin-overview-panel">
@@ -257,9 +255,9 @@ function SuperAdminDashboard({ state, billing, adminScope }) {
       </div>
       <div className="admin-overview-stats">
         <Metric label="Institutes" value={scopedInstitutes.length} tone="blue" />
-        <Metric label="Groups" value={scopedGroups.length} tone="blue" />
-        <Metric label="Credits left" value={remainingCredits} tone="green" />
-        <Metric label="Active invites" value={activeInvites} tone="green" />
+        <Metric label="Teacher records" value={teacherRecordCount} tone="blue" />
+        <Metric label="Loaded now" value={loadedNow} tone="green" />
+        <Metric label="Not loaded" value={Math.max(0, teacherRecordCount - loadedNow)} tone="green" />
       </div>
       <section className="admin-start-card">
         <h2>Choose an institute to begin</h2>
