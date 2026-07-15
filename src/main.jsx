@@ -4,7 +4,6 @@ import {
   demoUsers,
   examCatalog,
   firestoreCollections,
-  ndaResources,
   roles,
   subjectCatalog
 } from "./data/catalog.js";
@@ -460,7 +459,6 @@ function renderRoute(path, ctx) {
   if (path === "/admin/results") return <GuardedRoute path={path} ctx={ctx}>{isSuperAdmin(ctx.activeUser) ? <AdminResults {...ctx} /> : <SuperAdminPortal {...ctx} />}</GuardedRoute>;
   if (path === "/admin/users") return <GuardedRoute path={path} ctx={ctx}>{isSuperAdmin(ctx.activeUser) ? <AdminUsers {...ctx} /> : <SuperAdminPortal {...ctx} />}</GuardedRoute>;
   if (path === "/admin") return <GuardedRoute path={path} ctx={ctx}><SuperAdminPortal {...ctx} /></GuardedRoute>;
-  if (path === "/nda/resources") return <NdaResources />;
   return <Landing {...ctx} />;
 }
 
@@ -497,7 +495,6 @@ function TopBar({ activeUser, actions, navigate, path }) {
             {roleLabel} Portal
           </button>
         )}
-        <button className={path === "/nda/resources" ? "active" : ""} onClick={() => navigate("/nda/resources")}>NDA Resources</button>
       </nav>
       {activeUser ? (
         <div className="session-actions">
@@ -1424,22 +1421,6 @@ function AdminUsers({ state, actions }) {
               <option value="pending">pending</option>
               <option value="blocked">blocked</option>
             </select>
-          </article>
-        ))}
-      </div>
-    </section>
-  );
-}
-
-function NdaResources() {
-  return (
-    <section className="page-block">
-      <PageTitle eyebrow="NDA resources" title="Defence Sprouts content lives here now." />
-      <div className="resource-grid">
-        {ndaResources.map((resource) => (
-          <article className="resource-panel" key={resource.title}>
-            <h3>{resource.title}</h3>
-            <p>{resource.body}</p>
           </article>
         ))}
       </div>

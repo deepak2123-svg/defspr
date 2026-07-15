@@ -19,7 +19,7 @@ describe("gateway access", () => {
     expect(getPortalFromPath("/student-login")).toBe(null);
     expect(getPortalFromPath("/teacher-login")).toBe(null);
     expect(getPortalFromPath("/admin-login")).toBe(null);
-    expect(getPortalFromPath("/nda/resources")).toBe(null);
+    expect(getPortalFromPath("/dev-demo")).toBe(null);
   });
 
   it("requires the matching gateway for unauthenticated users", () => {

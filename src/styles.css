@@ -272,7 +272,6 @@ button:disabled {
 .test-card,
 .portal-card,
 .gateway-card,
-.resource-panel,
 .review-item,
 .user-row,
 .question-row {
@@ -478,7 +477,6 @@ p {
 
 .portal-grid,
 .test-grid,
-.resource-grid,
 .auth-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -644,7 +642,6 @@ p {
 }
 
 .test-card,
-.resource-panel,
 .review-item {
   display: grid;
   gap: 0.75rem;
@@ -1106,7 +1103,6 @@ a:focus-visible {
   .portal-grid,
   .gateway-grid,
   .test-grid,
-  .resource-grid,
   .auth-grid,
   .schema-grid,
   .admin-grid.two {
@@ -1139,7 +1135,6 @@ a:focus-visible {
   .gateway-grid,
   .mock-gateway-grid,
   .test-grid,
-  .resource-grid,
   .auth-grid,
   .schema-grid,
   .admin-grid.two,

@@ -557,21 +557,6 @@ export const seedBatches = [
   }
 ];
 
-export const ndaResources = [
-  {
-    title: "NDA written exam",
-    body: "Mathematics carries 300 marks and GAT carries 600 marks. The written score and SSB score combine for final merit."
-  },
-  {
-    title: "SSB overview",
-    body: "Shortlisted candidates attend a five-day board covering screening, psychology, GTO tasks, interview and conference."
-  },
-  {
-    title: "Medical readiness",
-    body: "Height, weight, vision, dental, ENT and general medical standards should be checked early before the board."
-  }
-];
-
 export const firestoreCollections = [
   "users",
   "memberships",
