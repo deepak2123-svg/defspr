@@ -247,6 +247,7 @@ function TopBar({ activeUser, actions, navigate, path }) {
           <>
             <button className={path === "/student-login" ? "active" : ""} onClick={() => navigate("/student-login")}>Student Login</button>
             <button className={path === "/teacher-login" ? "active" : ""} onClick={() => navigate("/teacher-login")}>Teacher Login</button>
+            <button className={path === "/admin-login" ? "active" : ""} onClick={() => navigate("/admin-login")}>Admin Login</button>
           </>
         )}
         {activeUser && roleHome !== "/" && (
@@ -268,7 +269,7 @@ function TopBar({ activeUser, actions, navigate, path }) {
         <div className="session-actions">
           <span className="session-chip public-session">
             <strong>Choose gateway</strong>
-            <small>Student or Teacher</small>
+            <small>Student, Teacher or Admin</small>
           </span>
         </div>
       )}
@@ -278,49 +279,95 @@ function TopBar({ activeUser, actions, navigate, path }) {
 
 function Landing({ state, actions }) {
   const liveQuestions = state.questions.filter((question) => question.status === "published").length;
+  const publishedTests = state.tests.filter((test) => test.status === "published").length;
+  const submittedAttempts = state.attempts.filter(isSubmittedAttempt).length;
   const firebaseLabel = isFirebaseConfigured ? "Firebase connected" : "Firebase pending";
+  const bookDemo = () => {
+    window.location.href = "https://ledgrclasses.com/mock-tests/#demo";
+  };
 
   return (
-    <section className="landing gateway-landing">
-      <div className="hero-panel gateway-hero">
-        <p className="eyebrow">Mock tests for NDA, NEET, JEE Main and JEE Advanced</p>
-        <h1>Start from the right Ledgr Test gateway.</h1>
-        <p className="lede">
-          Students enter a focused test-taking portal. Teachers enter a separate question-bank workspace.
-          NDA is live first, while NEET and JEE shells are prepared for future content.
-        </p>
-        <div className="hero-actions">
-          <button className="primary" onClick={() => actions.navigate("/student-login")}>Student gateway</button>
-          <button className="secondary light" onClick={() => actions.navigate("/teacher-login")}>Teacher gateway</button>
+    <section className="mock-marketing" aria-labelledby="mock-marketing-title">
+      <div className="mock-hero">
+        <div className="mock-hero-copy">
+          <p className="eyebrow">Ledgr Mock Tests</p>
+          <h1 id="mock-marketing-title">Timed practice tests with separate gateways for every role.</h1>
+          <p className="lede">
+            Students attempt focused NDA, JEE and NEET mocks. Teachers manage the question bank.
+            Admins publish tests, control access and review results from their own console.
+          </p>
+          <div className="hero-actions">
+            <button className="primary" onClick={() => actions.navigate("/student-login")}>Student Portal</button>
+            <button className="secondary" onClick={() => actions.navigate("/teacher-login")}>Teacher Workspace</button>
+            <button className="secondary" onClick={() => actions.navigate("/admin-login")}>Admin Console</button>
+            <button className="ghost" onClick={bookDemo}>Book a demo</button>
+          </div>
+        </div>
+        <div className="mock-hero-visual" aria-label="Demo student test dashboard">
+          <img src="/assets/mock-tests-student-dashboard.png" alt="Demo Ledgr Mock Tests student dashboard with safe sample NDA data." />
+          <span>Demo data</span>
         </div>
       </div>
-      <div className="metric-strip">
+
+      <div className="metric-strip mock-metrics">
         <Metric label="Live questions" value={liveQuestions} />
-        <Metric label="Published tests" value={state.tests.length} />
-        <Metric label="Student attempts" value={state.attempts.length} />
+        <Metric label="Published tests" value={publishedTests || state.tests.length} />
+        <Metric label="Submitted attempts" value={submittedAttempts} />
         <Metric label="Runtime" value={firebaseLabel} />
       </div>
-      <div className="gateway-grid">
-        <button className="gateway-card student-gateway" onClick={() => actions.navigate("/student-login")}>
-          <span className="pill">Student gateway</span>
-          <h2>Take NDA mocks and review analytics.</h2>
-          <p>Self-sign up for free public tests, continue attempts, submit timed mocks and review released results.</p>
-        </button>
-        <button className="gateway-card teacher-gateway" onClick={() => actions.navigate("/teacher-login")}>
-          <span className="pill">Teacher gateway</span>
-          <h2>Import, edit and publish question-bank content.</h2>
-          <p>Teacher accounts enter as pending until admin approval, then get subject-bank publishing access.</p>
-        </button>
-      </div>
-      <section className="section-panel">
-        <div>
-          <p className="eyebrow">Launch scope</p>
-          <h2>NDA first, multi-exam shell ready.</h2>
+
+      <section className="mock-section mock-split">
+        <div className="section-panel mock-copy-panel">
+          <p className="eyebrow">Question bank to result review</p>
+          <h2>One test workflow, three clean access points.</h2>
+          <p>
+            The public root is only the marketing page. Each role still enters through its own route,
+            so student attempts, teacher imports and admin publishing stay separated.
+          </p>
+          <ul className="mock-proof-list">
+            <li>Students see assigned tests, timers, attempts and released analytics.</li>
+            <li>Teachers import DOCX, PDF or text questions and review parsed MCQs.</li>
+            <li>Admins publish tests, manage users and export results.</li>
+          </ul>
         </div>
-        <p>
-          Defence Sprouts content now sits under NDA resources. The app structure is ready for NEET,
-          JEE Main and JEE Advanced once their question banks are added.
-        </p>
+        <div className="mock-image-panel">
+          <img src="/assets/mock-tests-builder-dashboard.png" alt="Demo teacher and admin mock test builder dashboard with safe sample data." />
+        </div>
+      </section>
+
+      <section className="mock-section">
+        <div className="section-head">
+          <div>
+            <p className="eyebrow">Gateways</p>
+            <h2>Send each user to the right doorway.</h2>
+          </div>
+        </div>
+        <div className="mock-gateway-grid">
+          <button className="mock-gateway-card student-gateway" onClick={() => actions.navigate("/student-login")}>
+            <span className="pill">Student Portal</span>
+            <h3>Attempt mocks and review released results.</h3>
+            <p>Focused test-taking, timers, answer palettes and score summaries for students.</p>
+          </button>
+          <button className="mock-gateway-card teacher-gateway" onClick={() => actions.navigate("/teacher-login")}>
+            <span className="pill">Teacher Workspace</span>
+            <h3>Import and maintain exam questions.</h3>
+            <p>Teacher accounts can prepare subject banks once approved by the admin team.</p>
+          </button>
+          <button className="mock-gateway-card admin-gateway" onClick={() => actions.navigate("/admin-login")}>
+            <span className="pill">Admin Console</span>
+            <h3>Publish tests and control access.</h3>
+            <p>Admins manage users, tests, batches and result exports from a restricted route.</p>
+          </button>
+        </div>
+      </section>
+
+      <section className="section-panel mock-cta">
+        <div>
+          <p className="eyebrow">Demo setup</p>
+          <h2>Bring Mock Tests into the Ledgr Classes system.</h2>
+          <p>Book a walkthrough from the main Ledgr site, using the same contact flow as the primary landing page.</p>
+        </div>
+        <button className="primary" onClick={bookDemo}>Book a demo</button>
       </section>
     </section>
   );
