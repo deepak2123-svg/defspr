@@ -24,12 +24,72 @@ const blankInstitute = {
 };
 
 const superAdminModules = [
-  { id: "dashboard", label: "Dashboard", short: "D" },
-  { id: "clients", label: "Clients", short: "C" },
-  { id: "invites", label: "Invites", short: "I" },
-  { id: "billing", label: "Billing", short: "B" },
-  { id: "audit", label: "Audit", short: "A" }
+  { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+  { id: "clients", label: "Clients", icon: "clients" },
+  { id: "invites", label: "Invites", icon: "invites" },
+  { id: "billing", label: "Billing", icon: "billing" },
+  { id: "audit", label: "Audit", icon: "audit" }
 ];
+
+const iconPaths = {
+  dashboard: (
+    <>
+      <rect x="4" y="4" width="7" height="7" rx="1.5" />
+      <rect x="13" y="4" width="7" height="7" rx="1.5" />
+      <rect x="4" y="13" width="7" height="7" rx="1.5" />
+      <rect x="13" y="13" width="7" height="7" rx="1.5" />
+    </>
+  ),
+  clients: (
+    <>
+      <circle cx="8" cy="8" r="3" />
+      <circle cx="16" cy="8" r="3" />
+      <path d="M3.5 19c.8-3.2 2.5-5 4.5-5s3.7 1.8 4.5 5" />
+      <path d="M11.5 19c.8-3.2 2.5-5 4.5-5s3.7 1.8 4.5 5" />
+    </>
+  ),
+  invites: (
+    <>
+      <rect x="4" y="5" width="16" height="13" rx="2" />
+      <path d="m5 7 7 6 7-6" />
+    </>
+  ),
+  billing: (
+    <>
+      <rect x="5" y="4" width="14" height="16" rx="2" />
+      <path d="M8 8h8" />
+      <path d="M8 12h8" />
+      <path d="M8 16h4" />
+    </>
+  ),
+  audit: (
+    <>
+      <path d="M9 5h6" />
+      <path d="M9 9h6" />
+      <path d="M9 13h3" />
+      <path d="M6 5h.01" />
+      <path d="M6 9h.01" />
+      <path d="M6 13h.01" />
+      <path d="M17 17l3 3" />
+      <circle cx="15" cy="15" r="3" />
+    </>
+  ),
+  signout: (
+    <>
+      <path d="M10 6H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h4" />
+      <path d="M15 8l4 4-4 4" />
+      <path d="M8 12h11" />
+    </>
+  )
+};
+
+function RailIcon({ name }) {
+  return (
+    <svg className="admin-module-icon" viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      {iconPaths[name]}
+    </svg>
+  );
+}
 
 function normalizeAdminState(state = {}) {
   return {
@@ -77,10 +137,15 @@ export function SuperAdminPortal({ state, activeUser, actions, adminScope }) {
         <aside className="admin-module-rail" aria-label="Super Admin modules">
           {superAdminModules.map((module) => (
             <button key={module.id} className={tab === module.id ? "active" : ""} onClick={() => setTab(module.id)} title={module.label}>
-              <span>{module.short}</span>
+              <RailIcon name={module.icon} />
               <strong>{module.label}</strong>
             </button>
           ))}
+          <span className="admin-rail-spacer" aria-hidden="true" />
+          <button className="admin-rail-action" onClick={actions.signOut} title="Sign out">
+            <RailIcon name="signout" />
+            <strong>Sign out</strong>
+          </button>
         </aside>
         <main className="admin-module-surface">
           {tab === "dashboard" && <SuperAdminDashboard state={adminState} billing={billing} adminScope={adminScope} />}

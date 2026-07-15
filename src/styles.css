@@ -292,8 +292,9 @@ button:disabled {
 }
 
 .admin-app-main {
-  width: min(1520px, calc(100% - 24px));
-  padding-top: 16px;
+  width: 100%;
+  margin: 0;
+  padding: 16px 16px 56px;
 }
 
 .data-status {
@@ -459,11 +460,14 @@ p {
 
 .super-admin-page {
   display: grid;
-  gap: 1rem;
+  gap: 0;
   color: #111827;
 }
 
 .admin-workspace-header {
+  position: sticky;
+  top: 0;
+  z-index: 60;
   display: flex;
   justify-content: space-between;
   gap: 1.2rem;
@@ -472,6 +476,7 @@ p {
   border-radius: 8px;
   background: #fff;
   box-shadow: 0 8px 28px rgba(16, 24, 39, 0.06);
+  margin-bottom: 1rem;
   padding: 1.1rem 1.25rem;
 }
 
@@ -545,18 +550,18 @@ p {
 
 .admin-workspace {
   display: grid;
-  grid-template-columns: 68px minmax(0, 1fr);
+  grid-template-columns: 58px minmax(0, 1fr);
   gap: 1rem;
   align-items: start;
 }
 
 .admin-module-rail {
   position: sticky;
-  top: 72px;
-  display: grid;
-  align-content: start;
+  top: 16px;
+  display: flex;
+  flex-direction: column;
   gap: 0.5rem;
-  min-height: calc(100vh - 96px);
+  height: calc(100vh - 32px);
   border: 1px solid #263244;
   border-radius: 10px;
   background: #101827;
@@ -567,8 +572,8 @@ p {
 .admin-module-rail button {
   display: grid;
   place-items: center;
-  width: 48px;
-  min-height: 48px;
+  width: 40px;
+  min-height: 40px;
   border: 1px solid #263244;
   border-radius: 8px;
   background: #151f30;
@@ -583,9 +588,14 @@ p {
   color: #fff;
 }
 
-.admin-module-rail button span {
-  font-size: 0.82rem;
-  font-weight: 800;
+.admin-module-icon {
+  width: 20px;
+  height: 20px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
 }
 
 .admin-module-rail button strong {
@@ -595,6 +605,20 @@ p {
   overflow: hidden;
   clip: rect(0 0 0 0);
   white-space: nowrap;
+}
+
+.admin-rail-spacer {
+  flex: 1;
+}
+
+.admin-rail-action {
+  color: #ffb7b7;
+}
+
+.admin-module-rail .admin-rail-action:hover {
+  border-color: #ef4444;
+  background: #3a1720;
+  color: #fff;
 }
 
 .admin-module-surface {
@@ -1361,10 +1385,14 @@ a:focus-visible {
     position: sticky;
     top: 0;
     z-index: 20;
-    grid-auto-flow: column;
-    grid-auto-columns: max-content;
-    min-height: auto;
+    flex-direction: row;
+    height: auto;
+    min-height: 0;
     overflow-x: auto;
+  }
+
+  .admin-rail-spacer {
+    flex: 1 0 0;
   }
 }
 
@@ -1436,6 +1464,10 @@ a:focus-visible {
   .admin-module-rail button {
     width: 44px;
     min-height: 44px;
+  }
+
+  .admin-app-main {
+    padding: 10px 10px 48px;
   }
 
   .session-chip {

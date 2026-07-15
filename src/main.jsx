@@ -427,10 +427,12 @@ function App() {
     [activeUser, remoteDataEnabled, state.invites, state.billingAccounts, state.creditLedger]
   );
 
+  const superAdminWorkspace = path === "/admin" && isSuperAdmin(activeUser);
+
   return (
     <div className="app-shell">
-      <TopBar activeUser={activeUser} actions={actions} navigate={navigate} path={path} />
-      <main className={`app-main${isAdminRoute(path) ? " admin-app-main" : ""}`}>
+      {!superAdminWorkspace && <TopBar activeUser={activeUser} actions={actions} navigate={navigate} path={path} />}
+      <main className={`app-main${superAdminWorkspace ? " admin-app-main" : ""}`}>
         <DataStatusBanner dataStatus={dataStatus} />
         {renderRoute(path, { state, activeUser, actions, dataStatus, adminScope })}
       </main>
