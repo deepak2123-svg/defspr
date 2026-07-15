@@ -4,7 +4,15 @@ This repo ships with Firebase-backed Auth/Firestore/Storage wiring plus a local 
 
 ## Collections
 
-- `users`: `uid`, `role`, `name`, `email`, `status`, `batchIds`, `teacherSubjectIds`
+- `users`: `uid`, current `role`, `name`, `email`, `status`, legacy student/teacher fields, `memberships`, `scopeKeys`
+- `memberships`: `userId`, `role`, `scopeType`, `groupId`, `instituteId`, `status`, optional `inviteToken`
+- `instituteGroups`: group clients such as ZEE with `name`, `code`, `status` and timestamps
+- `institutes`: standalone institutes or institutes under a group, with contact/location metadata
+- `invites`: single-use, 24-hour admin invite tokens for Super Admin, Group Admin and Institute Admin access
+- `billingAccounts`: group pooled credits or standalone institute credit accounts
+- `creditLedger`: manual purchase, adjustment, activation and refund entries
+- `platformSettings`: global settings such as one-price `pricing`
+- `auditLogs`: important Super Admin actions including client, invite, credit and scope changes
 - `exams`: exam definitions for NDA, NEET, JEE Main and JEE Advanced
 - `subjects`: subject definitions per exam
 - `chapters`: chapter definitions per subject
@@ -27,14 +35,19 @@ Run `npm run seed:firestore` after configuring `FIREBASE_PROJECT_ID` or `VITE_FI
 - initial NDA question bank
 - NDA diagnostic test
 - first admin profile from `LEDGR_ADMIN_UID` / `LEDGR_ADMIN_EMAIL`
+- first Super Admin membership and `scopeKeys`
+- sample institute group, institutes, billing accounts, credit ledger, pricing and audit data
 - optional demo student, approved teacher, pending teacher and batch records
 
 Set `LEDGR_SEED_DEMO_USERS=false` when seeding a clean production beta.
 
 ## Runtime behavior
 
-- Real Firebase users load allowed Firestore collections based on role.
+- Real Firebase users load allowed Firestore collections based on memberships and organization scope.
 - Demo users selected from `/dev-demo` stay local and never write Firestore.
+- Real Student/Teacher/Admin portal access is invite-only; normal sign-in requires an existing profile.
+- Admin invite links are claimed at `/invite/:token` after login/signup and immediately attach the invited membership.
+- Super Admin manages groups, institutes, admin invites, global pricing, manual credit ledger and audit logs.
 - Students can save and resume `in-progress` attempts; only submitted attempts count against attempt limits.
 - Teachers write imports and questions only after approval.
-- Admin writes tests, user role/status changes, result exports and full collection views.
+- Legacy `admin` profiles are normalized to `super_admin` for demo/backward compatibility.

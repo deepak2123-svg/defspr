@@ -8,6 +8,7 @@ import {
   roles,
   subjectCatalog
 } from "./data/catalog.js";
+import { InviteClaim, SuperAdminPortal, buildGroupFromDraft, buildInstituteFromDraft } from "./components/SuperAdminPortal.jsx";
 import { getRoleHome, normalizeUserProfile, portalHome, portalLogin, resolveAccess } from "./lib/access.js";
 import { createSeedState, replaceByUid, shouldUseFirestoreData, upsertById } from "./lib/appState.js";
 import { isFirebaseConfigured, ensureUserProfile, listenToAuth, signInWithEmail, signInWithGoogle, signOutCurrentUser, signUpWithEmail } from "./lib/firebase.js";
@@ -16,11 +17,23 @@ import {
   createTestInFirestore,
   loadFirestoreState,
   publishQuestionsToFirestore,
+  upsertDocumentInFirestore,
+  upsertDocumentsInFirestore,
   updateUserInFirestore,
   upsertAttemptInFirestore
 } from "./lib/firebaseRepository.js";
+import { isAdminUser, isSuperAdmin } from "./lib/memberships.js";
 import { extractTextFromFile, parseMcqText } from "./lib/parser.js";
 import { canStartAttempt, getTestDurationSeconds, scoreAttempt, shouldShowResult } from "./lib/scoring.js";
+import {
+  claimInviteForUser,
+  createAuditLog,
+  createBillingAccount,
+  createCreditLedgerEntry,
+  createInvite as buildInvite,
+  revokeInvite as revokeInviteRecord,
+  summarizeBillingAccount
+} from "./lib/superAdmin.js";
 import { loadState, saveState } from "./lib/localStore.js";
 import "./styles.css";
 
@@ -35,6 +48,7 @@ function App() {
   const [path, setPath] = useState(window.location.pathname);
   const [activeUser, setActiveUser] = useState(() => loadState(USER_KEY, null));
   const [state, setState] = useState(initialState);
+  const [adminScope, setAdminScopeState] = useState({ scopeType: "platform", groupId: null, instituteId: null });
   const [dataStatus, setDataStatus] = useState({ mode: isFirebaseConfigured ? "firebase-ready" : "local", message: "" });
   const remoteDataEnabled = shouldUseFirestoreData(activeUser, isFirebaseConfigured);
 
@@ -55,7 +69,7 @@ function App() {
     listenToAuth(async (firebaseUser) => {
       if (cancelled || !firebaseUser) return;
       try {
-        const profile = normalizeUserProfile(await ensureUserProfile(firebaseUser, "student"), "student");
+        const profile = normalizeUserProfile(await ensureUserProfile(firebaseUser, "student", "", { createIfMissing: false }), "student");
         setActiveUser((current) => current || profile);
       } catch (error) {
         setDataStatus({ mode: "error", message: error.message });
@@ -175,6 +189,224 @@ function App() {
           updateUserInFirestore(uid, patch).catch((error) => setDataStatus({ mode: "error", message: error.message }));
         }
       },
+      setAdminScope(scope) {
+        setAdminScopeState(scope);
+        const audit = createAuditLog({
+          actor: activeUser,
+          action: "scope.switch",
+          targetType: scope.scopeType || "platform",
+          targetId: scope.instituteId || scope.groupId || "platform",
+          scope
+        });
+        setState((current) => ({ ...current, auditLogs: [audit, ...current.auditLogs] }));
+        if (remoteDataEnabled && isSuperAdmin(activeUser)) {
+          upsertDocumentInFirestore("auditLogs", audit).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
+      },
+      createInstituteGroup(draft) {
+        const group = buildGroupFromDraft(draft, activeUser);
+        const billing = createBillingAccount({ ownerType: "group", groupId: group.id });
+        const audit = createAuditLog({
+          actor: activeUser,
+          action: "client.group.create",
+          targetType: "instituteGroup",
+          targetId: group.id,
+          scope: { scopeType: "group", groupId: group.id },
+          metadata: { name: group.name }
+        });
+        setState((current) => ({
+          ...current,
+          instituteGroups: [group, ...current.instituteGroups],
+          billingAccounts: [billing, ...current.billingAccounts],
+          auditLogs: [audit, ...current.auditLogs]
+        }));
+        if (remoteDataEnabled) {
+          Promise.all([
+            upsertDocumentInFirestore("instituteGroups", group),
+            upsertDocumentInFirestore("billingAccounts", billing),
+            upsertDocumentInFirestore("auditLogs", audit)
+          ]).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
+      },
+      createInstitute(draft) {
+        const institute = buildInstituteFromDraft(draft, activeUser);
+        const standaloneBilling = institute.groupId ? null : createBillingAccount({ ownerType: "institute", instituteId: institute.id });
+        const audit = createAuditLog({
+          actor: activeUser,
+          action: institute.groupId ? "client.group_institute.create" : "client.standalone_institute.create",
+          targetType: "institute",
+          targetId: institute.id,
+          scope: { scopeType: institute.groupId ? "group" : "institute", groupId: institute.groupId || null, instituteId: institute.id },
+          metadata: { name: institute.name }
+        });
+        setState((current) => ({
+          ...current,
+          institutes: [institute, ...current.institutes],
+          billingAccounts: standaloneBilling ? [standaloneBilling, ...current.billingAccounts] : current.billingAccounts,
+          auditLogs: [audit, ...current.auditLogs]
+        }));
+        if (remoteDataEnabled) {
+          const writes = [upsertDocumentInFirestore("institutes", institute), upsertDocumentInFirestore("auditLogs", audit)];
+          if (standaloneBilling) writes.push(upsertDocumentInFirestore("billingAccounts", standaloneBilling));
+          Promise.all(writes).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
+      },
+      importInstitutes(groupId, instituteDrafts) {
+        const institutes = instituteDrafts.map((draft) => buildInstituteFromDraft({ ...draft, groupId }, activeUser));
+        const audit = createAuditLog({
+          actor: activeUser,
+          action: "client.group_institutes.import",
+          targetType: "instituteGroup",
+          targetId: groupId,
+          scope: { scopeType: "group", groupId },
+          metadata: { imported: institutes.length }
+        });
+        setState((current) => ({
+          ...current,
+          institutes: [...institutes, ...current.institutes],
+          auditLogs: [audit, ...current.auditLogs]
+        }));
+        if (remoteDataEnabled) {
+          Promise.all([
+            upsertDocumentsInFirestore("institutes", institutes),
+            upsertDocumentInFirestore("auditLogs", audit)
+          ]).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
+      },
+      createInvite(draft) {
+        const invite = buildInvite({ ...draft, createdBy: activeUser });
+        const audit = createAuditLog({
+          actor: activeUser,
+          action: "invite.create",
+          targetType: "invite",
+          targetId: invite.id,
+          scope: { scopeType: invite.scopeType, groupId: invite.groupId, instituteId: invite.instituteId },
+          metadata: { role: invite.role }
+        });
+        setState((current) => ({ ...current, invites: [invite, ...current.invites], auditLogs: [audit, ...current.auditLogs] }));
+        if (remoteDataEnabled) {
+          Promise.all([
+            upsertDocumentInFirestore("invites", invite),
+            upsertDocumentInFirestore("auditLogs", audit)
+          ]).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
+      },
+      revokeInvite(inviteId) {
+        const invite = state.invites.find((item) => item.id === inviteId);
+        const revoked = revokeInviteRecord(invite);
+        if (!revoked) return;
+        const audit = createAuditLog({
+          actor: activeUser,
+          action: "invite.revoke",
+          targetType: "invite",
+          targetId: inviteId,
+          scope: { scopeType: revoked.scopeType, groupId: revoked.groupId, instituteId: revoked.instituteId }
+        });
+        setState((current) => ({
+          ...current,
+          invites: current.invites.map((item) => (item.id === inviteId ? revoked : item)),
+          auditLogs: [audit, ...current.auditLogs]
+        }));
+        if (remoteDataEnabled) {
+          Promise.all([
+            upsertDocumentInFirestore("invites", revoked),
+            upsertDocumentInFirestore("auditLogs", audit)
+          ]).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
+      },
+      savePricing(pricePerStudent) {
+        const pricing = {
+          id: "pricing",
+          pricePerStudent: Number(pricePerStudent) || 0,
+          currency: "INR",
+          updatedAt: new Date().toISOString(),
+          updatedBy: activeUser?.uid || "local"
+        };
+        const audit = createAuditLog({
+          actor: activeUser,
+          action: "billing.pricing.update",
+          targetType: "platformSettings",
+          targetId: "pricing",
+          scope: { scopeType: "platform" },
+          metadata: { pricePerStudent: pricing.pricePerStudent }
+        });
+        setState((current) => ({
+          ...current,
+          platformSettings: { ...current.platformSettings, pricing },
+          auditLogs: [audit, ...current.auditLogs]
+        }));
+        if (remoteDataEnabled) {
+          Promise.all([
+            upsertDocumentInFirestore("platformSettings", pricing),
+            upsertDocumentInFirestore("auditLogs", audit)
+          ]).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
+      },
+      addCreditPurchase(draft) {
+        const account = state.billingAccounts.find((item) => item.id === draft.billingAccountId);
+        if (!account) return;
+        const ledgerEntry = createCreditLedgerEntry({ ...draft, actor: activeUser, type: "purchase" });
+        const updatedAccount = summarizeBillingAccount({
+          ...account,
+          validityStart: draft.validityStart || account.validityStart,
+          validityEnd: draft.validityEnd || account.validityEnd,
+          updatedAt: new Date().toISOString()
+        }, [...state.creditLedger, ledgerEntry]);
+        const audit = createAuditLog({
+          actor: activeUser,
+          action: "billing.credits.purchase",
+          targetType: "billingAccount",
+          targetId: account.id,
+          scope: { scopeType: account.ownerType, groupId: account.groupId, instituteId: account.instituteId },
+          metadata: { quantity: ledgerEntry.quantity, amount: ledgerEntry.amount }
+        });
+        setState((current) => ({
+          ...current,
+          creditLedger: [ledgerEntry, ...current.creditLedger],
+          billingAccounts: current.billingAccounts.map((item) => (item.id === account.id ? updatedAccount : item)),
+          auditLogs: [audit, ...current.auditLogs]
+        }));
+        if (remoteDataEnabled) {
+          Promise.all([
+            upsertDocumentInFirestore("creditLedger", ledgerEntry),
+            upsertDocumentInFirestore("billingAccounts", updatedAccount),
+            upsertDocumentInFirestore("auditLogs", audit)
+          ]).catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
+      },
+      claimInvite(inviteId, profileSource = activeUser) {
+        const invite = state.invites.find((item) => item.id === inviteId || item.token === inviteId);
+        const profile = normalizeUserProfile(profileSource, invite?.role || "student");
+        const result = claimInviteForUser(invite, profile);
+        if (!result.ok) return result;
+        const claimedUser = result.user;
+        const audit = createAuditLog({
+          actor: claimedUser,
+          action: "invite.claim",
+          targetType: "invite",
+          targetId: invite.id,
+          scope: { scopeType: invite.scopeType, groupId: invite.groupId, instituteId: invite.instituteId },
+          metadata: { role: invite.role }
+        });
+        setActiveUser(claimedUser);
+        setState((current) => ({
+          ...current,
+          users: current.users.some((user) => user.uid === claimedUser.uid) ? replaceByUid(current.users, claimedUser.uid, claimedUser) : [claimedUser, ...current.users],
+          memberships: upsertById(current.memberships, result.membership),
+          invites: current.invites.map((item) => (item.id === invite.id ? result.invite : item)),
+          auditLogs: [audit, ...current.auditLogs]
+        }));
+        if (remoteDataEnabled || isFirebaseConfigured) {
+          upsertDocumentInFirestore("invites", result.invite)
+            .then(() => Promise.all([
+              upsertDocumentInFirestore("users", claimedUser, "uid"),
+              upsertDocumentInFirestore("memberships", result.membership),
+              upsertDocumentInFirestore("auditLogs", audit)
+            ]))
+            .catch((error) => setDataStatus({ mode: "error", message: error.message }));
+        }
+        return result;
+      },
       async signOut() {
         try {
           if (isFirebaseConfigured) await signOutCurrentUser();
@@ -184,7 +416,7 @@ function App() {
         }
       }
     }),
-    [activeUser?.uid, remoteDataEnabled]
+    [activeUser, remoteDataEnabled, state.invites, state.billingAccounts, state.creditLedger]
   );
 
   return (
@@ -192,7 +424,7 @@ function App() {
       <TopBar activeUser={activeUser} actions={actions} navigate={navigate} path={path} />
       <main className="app-main">
         <DataStatusBanner dataStatus={dataStatus} />
-        {renderRoute(path, { state, activeUser, actions, dataStatus })}
+        {renderRoute(path, { state, activeUser, actions, dataStatus, adminScope })}
       </main>
     </div>
   );
@@ -202,6 +434,7 @@ function renderRoute(path, ctx) {
   if (path === "/student-login") return <GatewayLogin key="student-login" gateway="student" {...ctx} />;
   if (path === "/teacher-login") return <GatewayLogin key="teacher-login" gateway="teacher" {...ctx} />;
   if (path === "/admin-login") return <GatewayLogin key="admin-login" gateway="admin" {...ctx} />;
+  if (path.startsWith("/invite/")) return <InviteClaim token={path.split("/").pop()} {...ctx} />;
   if (path === "/dev-demo") return <DevDemoGateway {...ctx} />;
   if (path.startsWith("/student/attempt/")) {
     return <GuardedRoute path={path} ctx={ctx}><AttemptRunner testId={path.split("/").pop()} {...ctx} /></GuardedRoute>;
@@ -214,10 +447,10 @@ function renderRoute(path, ctx) {
   if (path === "/teacher/import") return <GuardedRoute path={path} ctx={ctx}><TeacherImport {...ctx} /></GuardedRoute>;
   if (path === "/teacher/questions") return <GuardedRoute path={path} ctx={ctx}><TeacherQuestions {...ctx} /></GuardedRoute>;
   if (path === "/teacher") return <GuardedRoute path={path} ctx={ctx}><TeacherDashboard {...ctx} /></GuardedRoute>;
-  if (path === "/admin/tests") return <GuardedRoute path={path} ctx={ctx}><AdminTests {...ctx} /></GuardedRoute>;
-  if (path === "/admin/results") return <GuardedRoute path={path} ctx={ctx}><AdminResults {...ctx} /></GuardedRoute>;
-  if (path === "/admin/users") return <GuardedRoute path={path} ctx={ctx}><AdminUsers {...ctx} /></GuardedRoute>;
-  if (path === "/admin") return <GuardedRoute path={path} ctx={ctx}><AdminDashboard {...ctx} /></GuardedRoute>;
+  if (path === "/admin/tests") return <GuardedRoute path={path} ctx={ctx}>{isSuperAdmin(ctx.activeUser) ? <AdminTests {...ctx} /> : <SuperAdminPortal {...ctx} />}</GuardedRoute>;
+  if (path === "/admin/results") return <GuardedRoute path={path} ctx={ctx}>{isSuperAdmin(ctx.activeUser) ? <AdminResults {...ctx} /> : <SuperAdminPortal {...ctx} />}</GuardedRoute>;
+  if (path === "/admin/users") return <GuardedRoute path={path} ctx={ctx}>{isSuperAdmin(ctx.activeUser) ? <AdminUsers {...ctx} /> : <SuperAdminPortal {...ctx} />}</GuardedRoute>;
+  if (path === "/admin") return <GuardedRoute path={path} ctx={ctx}><SuperAdminPortal {...ctx} /></GuardedRoute>;
   if (path === "/nda/resources") return <NdaResources />;
   return <Landing {...ctx} />;
 }
@@ -381,7 +614,7 @@ const gatewayCopy = {
     body: "Sign in or create a student account to access public NDA tests, assigned batches, timed attempts and released results.",
     home: portalHome.student,
     fallbackRole: "student",
-    allowSignup: true,
+    allowSignup: false,
     signupLabel: "Create student account",
     defaultEmail: "student@example.com"
   },
@@ -392,7 +625,7 @@ const gatewayCopy = {
     body: "Sign in to import, edit and publish questions. New teacher accounts remain pending until admin approval.",
     home: portalHome.teacher,
     fallbackRole: "teacher",
-    allowSignup: true,
+    allowSignup: false,
     signupLabel: "Request teacher access",
     defaultEmail: "teacher@example.com"
   },
@@ -429,7 +662,7 @@ function GatewayLogin({ gateway, activeUser, actions }) {
   async function finishLogin(profileSource) {
     const profile = normalizeUserProfile(profileSource, config.fallbackRole);
 
-    if (gateway === "admin" && profile.role !== "admin") {
+    if (gateway === "admin" && !isAdminUser(profile)) {
       try {
         if (isFirebaseConfigured) await signOutCurrentUser();
       } catch {
@@ -473,8 +706,8 @@ function GatewayLogin({ gateway, activeUser, actions }) {
     }
     try {
       const result = nextMode === "signup"
-        ? await signUpWithEmail(email, password, name, config.fallbackRole)
-        : await signInWithEmail(email, password, config.fallbackRole);
+        ? await signUpWithEmail(email, password, name, config.fallbackRole, { createIfMissing: true })
+        : await signInWithEmail(email, password, config.fallbackRole, { createIfMissing: false });
       await finishLogin(result.profile || result.user);
     } catch (error) {
       setMessage(error.message);
@@ -534,7 +767,11 @@ function GatewayLogin({ gateway, activeUser, actions }) {
             <button className="primary" onClick={() => handleEmail(mode)}>{mode === "signup" ? config.signupLabel : "Email sign in"}</button>
           </div>
         </div>
-        {gateway === "admin" && <p className="muted">Admin accounts must be created from the seeded admin UID/email in Firestore.</p>}
+        <p className="muted">
+          {gateway === "admin"
+            ? "Admin accounts must be seeded or claimed through a Super Admin invite link."
+            : "Real Ledgr portals are invite-only. Ask your institute admin for an invite link."}
+        </p>
         {message && <p className="notice">{message}</p>}
       </section>
     </section>

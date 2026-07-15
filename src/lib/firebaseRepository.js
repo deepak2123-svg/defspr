@@ -1,5 +1,6 @@
 import { getFirebaseServices } from "./firebase.js";
 import { mergeRemoteState } from "./appState.js";
+import { getActiveMemberships, isSuperAdmin } from "./memberships.js";
 
 function normalizeDoc(docSnapshot) {
   return cleanFirestoreValue({ id: docSnapshot.id, ...docSnapshot.data() });
@@ -52,6 +53,17 @@ async function readOwnUser(user) {
   return snapshot.exists() ? normalizeDoc(snapshot) : user;
 }
 
+async function readDocSafely(name, id, fallback = null) {
+  try {
+    const { db, firestoreModule } = await getFirebaseServices();
+    const snapshot = await firestoreModule.getDoc(firestoreModule.doc(db, name, id));
+    return snapshot.exists() ? normalizeDoc(snapshot) : fallback;
+  } catch (error) {
+    console.warn(`Ledgr Test could not read ${name}/${id}:`, error.message);
+    return fallback;
+  }
+}
+
 async function readQuestionsForRole(user) {
   const { firestoreModule } = await getFirebaseServices();
   if (user.role === "admin") return readCollectionSafely("questions");
@@ -75,11 +87,29 @@ async function readQuestionsForRole(user) {
 
 export async function loadFirestoreState(user) {
   const { firestoreModule } = await getFirebaseServices();
-  const isAdmin = user.role === "admin";
+  const activeMemberships = getActiveMemberships(user);
+  const superAdmin = isSuperAdmin(user);
+  const adminMembership = activeMemberships.find((membership) => ["super_admin", "group_admin", "institute_admin"].includes(membership.role));
+  const isAdmin = superAdmin;
   const isStudent = user.role === "student";
   const isTeacher = user.role === "teacher";
+  const groupMemberships = activeMemberships.filter((membership) => membership.role === "group_admin" && membership.groupId);
+  const instituteMemberships = activeMemberships.filter((membership) => membership.role === "institute_admin" && membership.instituteId);
 
-  const [questions, tests, attempts, imports, users, batches, flags] = await Promise.all([
+  const scopedGroups = superAdmin
+    ? readCollectionSafely("instituteGroups")
+    : groupMemberships.length
+      ? Promise.all(groupMemberships.map((membership) => readDocSafely("instituteGroups", membership.groupId))).then((items) => items.filter(Boolean))
+      : [];
+  const scopedInstitutes = superAdmin
+    ? readCollectionSafely("institutes")
+    : groupMemberships.length
+      ? Promise.all(groupMemberships.map((membership) => readCollectionSafely("institutes", [firestoreModule.where("groupId", "==", membership.groupId)]))).then((groups) => groups.flat())
+      : instituteMemberships.length
+        ? Promise.all(instituteMemberships.map((membership) => readDocSafely("institutes", membership.instituteId))).then((items) => items.filter(Boolean))
+        : [];
+
+  const [questions, tests, attempts, imports, users, batches, flags, memberships, instituteGroups, institutes, invites, billingAccounts, creditLedger, pricing, auditLogs] = await Promise.all([
     readQuestionsForRole(user),
     isAdmin ? readCollectionSafely("tests") : readCollectionSafely("tests", [firestoreModule.where("status", "==", "published")]),
     isAdmin
@@ -98,7 +128,23 @@ export async function loadFirestoreState(user) {
       : isStudent
         ? readCollectionSafely("batches", [firestoreModule.where("studentIds", "array-contains", user.uid)])
         : [],
-    isAdmin ? readCollectionSafely("flags") : []
+    isAdmin ? readCollectionSafely("flags") : [],
+    superAdmin
+      ? readCollectionSafely("memberships")
+      : readCollectionSafely("memberships", [firestoreModule.where("userId", "==", user.uid)]),
+    scopedGroups,
+    scopedInstitutes,
+    superAdmin ? readCollectionSafely("invites") : [],
+    superAdmin
+      ? readCollectionSafely("billingAccounts")
+      : adminMembership?.role === "group_admin"
+        ? readCollectionSafely("billingAccounts", [firestoreModule.where("groupId", "==", adminMembership.groupId)])
+        : adminMembership?.role === "institute_admin"
+          ? readCollectionSafely("billingAccounts", [firestoreModule.where("instituteId", "==", adminMembership.instituteId)])
+          : [],
+    superAdmin ? readCollectionSafely("creditLedger") : [],
+    readDocSafely("platformSettings", "pricing"),
+    superAdmin ? readCollectionSafely("auditLogs") : []
   ]);
 
   return mergeRemoteState(
@@ -108,6 +154,14 @@ export async function loadFirestoreState(user) {
       attempts: sortNewestFirst(attempts),
       imports: sortNewestFirst(imports),
       users,
+      memberships,
+      instituteGroups: sortNewestFirst(instituteGroups),
+      institutes: sortNewestFirst(institutes),
+      invites: sortNewestFirst(invites),
+      billingAccounts,
+      creditLedger: sortNewestFirst(creditLedger),
+      platformSettings: pricing ? { pricing } : undefined,
+      auditLogs: sortNewestFirst(auditLogs),
       batches,
       flags: sortNewestFirst(flags)
     },
@@ -144,4 +198,22 @@ export async function updateUserInFirestore(uid, patch) {
 export async function addFlagToFirestore(flag) {
   const { db, firestoreModule } = await getFirebaseServices();
   await firestoreModule.setDoc(firestoreModule.doc(db, "flags", flag.id), stripUndefined(flag), { merge: true });
+}
+
+export async function upsertDocumentInFirestore(collectionName, item, idField = "id") {
+  const { db, firestoreModule } = await getFirebaseServices();
+  const id = item?.[idField];
+  if (!id) throw new Error(`${collectionName} document is missing ${idField}.`);
+  await firestoreModule.setDoc(firestoreModule.doc(db, collectionName, id), stripUndefined(item), { merge: true });
+}
+
+export async function upsertDocumentsInFirestore(collectionName, items, idField = "id") {
+  const { db, firestoreModule } = await getFirebaseServices();
+  const batch = firestoreModule.writeBatch(db);
+  items.forEach((item) => {
+    const id = item?.[idField];
+    if (!id) throw new Error(`${collectionName} document is missing ${idField}.`);
+    batch.set(firestoreModule.doc(db, collectionName, id), stripUndefined(item), { merge: true });
+  });
+  await batch.commit();
 }

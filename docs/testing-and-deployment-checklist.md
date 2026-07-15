@@ -23,9 +23,11 @@ npm run seed:firestore
 ```
 
 7. Verify login flows:
-   - student signup lands on `/student`
-   - teacher signup lands on approval-pending state
-   - admin direct login at `/admin-login` lands on `/admin`
+   - public student/teacher signup is not available from real gateways
+   - seeded Super Admin direct login at `/admin-login` lands on `/admin`
+   - Super Admin can create a group, add/import institutes, add credits and generate an invite
+   - `/invite/:token` lets a signed-in/new user claim the invited admin role once
+   - Group Admin/Institute Admin claim lands on the minimal scoped `/admin` dashboard
    - non-admin on `/admin-login` is denied
 
 ## Local Emulator
@@ -43,7 +45,7 @@ npm run firebase:emulators
 npm run seed:firestore
 ```
 
-4. Run the app and test Student, Teacher and Admin gateways.
+4. Run the app and test Student, Teacher, Super Admin and invite-claim gateways.
 
 ## Vercel
 
@@ -56,6 +58,10 @@ npm run seed:firestore
    - `/student-login`
    - `/teacher-login`
    - `/admin-login`
+   - `/invite/:token`
+   - Super Admin dashboard tabs: Dashboard, Clients, Invites, Billing, Audit
+   - ZEE-style group setup with CSV institute import
+   - prepaid credit ledger update
    - student test submission and result view
    - teacher import and publish
-   - admin teacher approval and CSV export
+   - scoped Group Admin/Institute Admin dashboard after invite claim

@@ -5,7 +5,15 @@ import { getFirestore } from "firebase-admin/firestore";
 import {
   demoUsers,
   examCatalog,
+  seedAuditLogs,
   seedBatches,
+  seedBillingAccounts,
+  seedCreditLedger,
+  seedInstituteGroups,
+  seedInstitutes,
+  seedInvites,
+  seedMemberships,
+  seedPlatformSettings,
   seedQuestions,
   seedTests,
   subjectCatalog
@@ -39,12 +47,25 @@ const db = getFirestore();
 
 const adminUser = {
   uid: process.env.LEDGR_ADMIN_UID || "admin-demo",
-  role: "admin",
+  role: "super_admin",
   status: "active",
   name: process.env.LEDGR_ADMIN_NAME || "Ledgr Test Admin",
   email: process.env.LEDGR_ADMIN_EMAIL || "admin@ledgr.test",
   batchIds: [],
-  teacherSubjectIds: []
+  teacherSubjectIds: [],
+  memberships: [
+    {
+      id: `membership-${process.env.LEDGR_ADMIN_UID || "admin-demo"}-platform`,
+      userId: process.env.LEDGR_ADMIN_UID || "admin-demo",
+      role: "super_admin",
+      scopeType: "platform",
+      groupId: null,
+      instituteId: null,
+      status: "active",
+      createdAt: new Date().toISOString()
+    }
+  ],
+  scopeKeys: ["platform:super_admin"]
 };
 
 const users = seedDemoUsers
@@ -70,6 +91,14 @@ await writeDocs("chapters", chapters);
 await writeDocs("questions", seedQuestions);
 await writeDocs("tests", seedTests);
 await writeDocs("users", users, "uid");
+await writeDocs("memberships", [...adminUser.memberships, ...seedMemberships.filter((membership) => membership.userId !== adminUser.uid)]);
+await writeDocs("instituteGroups", seedInstituteGroups);
+await writeDocs("institutes", seedInstitutes);
+await writeDocs("invites", seedInvites);
+await writeDocs("billingAccounts", seedBillingAccounts);
+await writeDocs("creditLedger", seedCreditLedger);
+await writeDocs("auditLogs", seedAuditLogs);
+await writeDocs("platformSettings", [seedPlatformSettings.pricing]);
 await writeDocs("batches", seedBatches);
 
 console.log(`Seeded Ledgr Test Firestore project ${projectId}.`);

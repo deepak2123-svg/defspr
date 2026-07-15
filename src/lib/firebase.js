@@ -54,21 +54,21 @@ export async function signInWithGoogle(fallbackRole = "student") {
   const { auth, authModule } = await getFirebaseServices();
   const provider = new authModule.GoogleAuthProvider();
   const credential = await authModule.signInWithPopup(auth, provider);
-  const profile = await ensureUserProfile(credential.user, fallbackRole);
+  const profile = await ensureUserProfile(credential.user, fallbackRole, "", { createIfMissing: false });
   return { user: credential.user, profile };
 }
 
-export async function signInWithEmail(email, password, fallbackRole = "student") {
+export async function signInWithEmail(email, password, fallbackRole = "student", options = {}) {
   const { auth, authModule } = await getFirebaseServices();
   const credential = await authModule.signInWithEmailAndPassword(auth, email, password);
-  const profile = await ensureUserProfile(credential.user, fallbackRole);
+  const profile = await ensureUserProfile(credential.user, fallbackRole, "", { createIfMissing: options.createIfMissing === true });
   return { user: credential.user, profile };
 }
 
-export async function signUpWithEmail(email, password, name, fallbackRole = "student") {
+export async function signUpWithEmail(email, password, name, fallbackRole = "student", options = {}) {
   const { auth, authModule } = await getFirebaseServices();
   const credential = await authModule.createUserWithEmailAndPassword(auth, email, password);
-  const profile = await ensureUserProfile(credential.user, fallbackRole, name);
+  const profile = await ensureUserProfile(credential.user, fallbackRole, name, { createIfMissing: options.createIfMissing !== false });
   return { user: credential.user, profile };
 }
 
@@ -82,13 +82,16 @@ export async function signOutCurrentUser() {
   return authModule.signOut(auth);
 }
 
-export async function ensureUserProfile(user, fallbackRole = "student", name = "") {
+export async function ensureUserProfile(user, fallbackRole = "student", name = "", options = {}) {
   const { db, firestoreModule } = await getFirebaseServices();
   if (!user) return null;
 
   const userRef = firestoreModule.doc(firestoreModule.collection(db, "users"), user.uid);
   const snapshot = await firestoreModule.getDoc(userRef);
   if (snapshot.exists()) return snapshot.data();
+  if (options.createIfMissing === false) {
+    throw new Error("This account is not invited yet. Ask Super Admin for an invite link before joining Ledgr Test.");
+  }
 
   const profile = {
     uid: user.uid,

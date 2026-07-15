@@ -1,4 +1,24 @@
 export const roles = {
+  super_admin: {
+    label: "Super Admin",
+    home: "/admin",
+    description: "Create institute groups, standalone institutes, admin invites, pricing, credits and audit views."
+  },
+  group_admin: {
+    label: "Group Admin",
+    home: "/admin",
+    description: "View one institute group, its institutes, credit usage and setup status."
+  },
+  institute_admin: {
+    label: "Institute Admin",
+    home: "/admin",
+    description: "View one institute setup, credit status and invited admin scope."
+  },
+  admin: {
+    label: "Super Admin",
+    home: "/admin",
+    description: "Legacy admin alias mapped to Super Admin membership."
+  },
   student: {
     label: "Student",
     home: "/student",
@@ -308,14 +328,225 @@ export const demoUsers = [
   },
   {
     uid: "admin-demo",
-    role: "admin",
+    role: "super_admin",
     status: "active",
     name: "Deepak Admin",
     email: "admin@ledgr.test",
     batchIds: [],
-    teacherSubjectIds: []
+    teacherSubjectIds: [],
+    memberships: [
+      {
+        id: "membership-admin-demo-platform",
+        userId: "admin-demo",
+        role: "super_admin",
+        scopeType: "platform",
+        groupId: null,
+        instituteId: null,
+        status: "active",
+        createdAt: "2026-07-15T00:00:00.000Z"
+      }
+    ],
+    scopeKeys: ["platform:super_admin"]
+  },
+  {
+    uid: "zee-group-admin-demo",
+    role: "group_admin",
+    status: "active",
+    name: "ZEE Group Admin",
+    email: "group.admin@zee.test",
+    batchIds: [],
+    teacherSubjectIds: [],
+    memberships: [
+      {
+        id: "membership-zee-group-admin-demo",
+        userId: "zee-group-admin-demo",
+        role: "group_admin",
+        scopeType: "group",
+        groupId: "group-zee",
+        instituteId: null,
+        status: "active",
+        createdAt: "2026-07-15T00:00:00.000Z"
+      }
+    ],
+    scopeKeys: ["group:group-zee:group_admin"]
+  },
+  {
+    uid: "zee-delhi-admin-demo",
+    role: "institute_admin",
+    status: "active",
+    name: "ZEE Delhi Admin",
+    email: "delhi.admin@zee.test",
+    batchIds: [],
+    teacherSubjectIds: [],
+    memberships: [
+      {
+        id: "membership-zee-delhi-admin-demo",
+        userId: "zee-delhi-admin-demo",
+        role: "institute_admin",
+        scopeType: "institute",
+        groupId: "group-zee",
+        instituteId: "inst-zee-delhi",
+        status: "active",
+        createdAt: "2026-07-15T00:00:00.000Z"
+      }
+    ],
+    scopeKeys: ["institute:inst-zee-delhi:institute_admin"]
   }
 ];
+
+export const seedInstituteGroups = [
+  {
+    id: "group-zee",
+    name: "ZEE Group",
+    code: "ZEE",
+    status: "active",
+    createdAt: "2026-07-15T00:00:00.000Z",
+    updatedAt: "2026-07-15T00:00:00.000Z"
+  }
+];
+
+export const seedInstitutes = [
+  {
+    id: "inst-zee-delhi",
+    groupId: "group-zee",
+    name: "ZEE Delhi",
+    code: "ZEE-DEL",
+    city: "Delhi",
+    state: "Delhi",
+    address: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    status: "active",
+    createdAt: "2026-07-15T00:00:00.000Z",
+    updatedAt: "2026-07-15T00:00:00.000Z"
+  },
+  {
+    id: "inst-zee-pune",
+    groupId: "group-zee",
+    name: "ZEE Pune",
+    code: "ZEE-PUN",
+    city: "Pune",
+    state: "Maharashtra",
+    address: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    status: "active",
+    createdAt: "2026-07-15T00:00:00.000Z",
+    updatedAt: "2026-07-15T00:00:00.000Z"
+  },
+  {
+    id: "inst-defence-sprouts",
+    groupId: null,
+    name: "Defence Sprouts",
+    code: "DS",
+    city: "Pune",
+    state: "Maharashtra",
+    address: "",
+    contactName: "",
+    contactPhone: "",
+    contactEmail: "",
+    status: "active",
+    createdAt: "2026-07-15T00:00:00.000Z",
+    updatedAt: "2026-07-15T00:00:00.000Z"
+  }
+];
+
+export const seedMemberships = demoUsers.flatMap((user) => user.memberships || []);
+
+export const seedBillingAccounts = [
+  {
+    id: "billing-group-group-zee",
+    ownerType: "group",
+    groupId: "group-zee",
+    instituteId: null,
+    purchasedCredits: 10000,
+    usedCredits: 7420,
+    remainingCredits: 2580,
+    validityStart: "2026-04-01",
+    validityEnd: "2027-03-31",
+    status: "active",
+    createdAt: "2026-07-15T00:00:00.000Z",
+    updatedAt: "2026-07-15T00:00:00.000Z"
+  },
+  {
+    id: "billing-institute-inst-defence-sprouts",
+    ownerType: "institute",
+    groupId: null,
+    instituteId: "inst-defence-sprouts",
+    purchasedCredits: 500,
+    usedCredits: 0,
+    remainingCredits: 500,
+    validityStart: "2026-04-01",
+    validityEnd: "2027-03-31",
+    status: "active",
+    createdAt: "2026-07-15T00:00:00.000Z",
+    updatedAt: "2026-07-15T00:00:00.000Z"
+  }
+];
+
+export const seedCreditLedger = [
+  {
+    id: "credit-zee-purchase",
+    billingAccountId: "billing-group-group-zee",
+    type: "purchase",
+    quantity: 10000,
+    amount: 1490000,
+    paymentReference: "seed-zee",
+    note: "Initial ZEE group prepaid credits",
+    createdBy: "admin-demo",
+    createdAt: "2026-07-15T00:00:00.000Z"
+  },
+  {
+    id: "credit-zee-activation-sample",
+    billingAccountId: "billing-group-group-zee",
+    type: "activation",
+    quantity: 7420,
+    amount: 0,
+    paymentReference: "",
+    note: "Sample active student usage",
+    createdBy: "system",
+    createdAt: "2026-07-15T00:00:00.000Z"
+  },
+  {
+    id: "credit-ds-purchase",
+    billingAccountId: "billing-institute-inst-defence-sprouts",
+    type: "purchase",
+    quantity: 500,
+    amount: 74500,
+    paymentReference: "seed-ds",
+    note: "Initial standalone institute credits",
+    createdBy: "admin-demo",
+    createdAt: "2026-07-15T00:00:00.000Z"
+  }
+];
+
+export const seedInvites = [];
+
+export const seedAuditLogs = [
+  {
+    id: "audit-seed-setup",
+    actorUid: "system",
+    actorName: "System",
+    action: "seed.super_admin_foundation",
+    targetType: "platform",
+    targetId: "ledgr",
+    scope: { scopeType: "platform" },
+    metadata: { groups: 1, institutes: 3 },
+    createdAt: "2026-07-15T00:00:00.000Z"
+  }
+];
+
+export const seedPlatformSettings = {
+  pricing: {
+    id: "pricing",
+    pricePerStudent: 149,
+    currency: "INR",
+    updatedAt: "2026-07-15T00:00:00.000Z",
+    updatedBy: "seed"
+  }
+};
 
 export const seedBatches = [
   {
@@ -343,6 +574,14 @@ export const ndaResources = [
 
 export const firestoreCollections = [
   "users",
+  "memberships",
+  "instituteGroups",
+  "institutes",
+  "invites",
+  "billingAccounts",
+  "creditLedger",
+  "platformSettings",
+  "auditLogs",
   "exams",
   "subjects",
   "chapters",

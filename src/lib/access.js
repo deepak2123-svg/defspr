@@ -1,7 +1,12 @@
+import { getPrimaryAdminMembership, getRoleHomeForUser, isAdminUser, isSuperAdmin, normalizeRole } from "./memberships.js";
+
 export const portalHome = {
   student: "/student",
   teacher: "/teacher",
-  admin: "/admin"
+  admin: "/admin",
+  super_admin: "/admin",
+  group_admin: "/admin",
+  institute_admin: "/admin"
 };
 
 export const portalLogin = {
@@ -27,26 +32,31 @@ export function getPortalFromPath(path) {
 }
 
 export function getRoleHome(user) {
-  return portalHome[user?.role] || "/";
+  return getRoleHomeForUser(user);
 }
 
 export function normalizeUserProfile(user, fallbackRole = "student") {
-  const role = user?.role || fallbackRole;
+  const role = normalizeRole(user?.role || fallbackRole);
   const status = user?.status || (role === "teacher" ? "pending" : "active");
 
   return {
     uid: user?.uid || user?.id || "",
     role,
+    legacyRole: user?.role === "admin" ? "admin" : user?.legacyRole,
     status,
     name: user?.name || user?.displayName || user?.email?.split("@")[0] || "Ledgr user",
     email: user?.email || "",
+    groupId: user?.groupId || null,
+    instituteId: user?.instituteId || null,
     batchIds: Array.isArray(user?.batchIds) ? user.batchIds : [],
-    teacherSubjectIds: Array.isArray(user?.teacherSubjectIds) ? user.teacherSubjectIds : []
+    teacherSubjectIds: Array.isArray(user?.teacherSubjectIds) ? user.teacherSubjectIds : [],
+    memberships: Array.isArray(user?.memberships) ? user.memberships : [],
+    scopeKeys: Array.isArray(user?.scopeKeys) ? user.scopeKeys : []
   };
 }
 
 export function isAdmin(user) {
-  return user?.role === "admin" && user?.status !== "blocked";
+  return user?.status !== "blocked" && isAdminUser(user);
 }
 
 export function isActiveStudent(user) {
@@ -81,10 +91,21 @@ export function resolveAccess(path, user) {
   }
 
   if (isAdmin(profile)) {
+    const adminMembership = getPrimaryAdminMembership(profile);
+    if (portal === "admin" || isSuperAdmin(profile)) {
+      return {
+        allowed: true,
+        portal,
+        reason: portal === "admin" ? adminMembership?.role || "admin" : "admin-override",
+        membership: adminMembership,
+        superAdmin: isSuperAdmin(profile)
+      };
+    }
     return {
-      allowed: true,
+      allowed: false,
       portal,
-      reason: portal === "admin" ? "admin" : "admin-override"
+      reason: "wrong-portal",
+      roleHome: "/admin"
     };
   }
 

@@ -5,6 +5,13 @@ const student = { uid: "s1", role: "student", status: "active", name: "Student" 
 const teacher = { uid: "t1", role: "teacher", status: "approved", name: "Teacher" };
 const pendingTeacher = { uid: "t2", role: "teacher", status: "pending", name: "Pending" };
 const admin = { uid: "a1", role: "admin", status: "active", name: "Admin" };
+const groupAdmin = {
+  uid: "g1",
+  role: "group_admin",
+  status: "active",
+  name: "Group Admin",
+  memberships: [{ role: "group_admin", scopeType: "group", groupId: "group-zee", status: "active" }]
+};
 
 describe("gateway access", () => {
   it("keeps login and public pages outside protected portals", () => {
@@ -50,6 +57,15 @@ describe("gateway access", () => {
     expect(resolveAccess("/student/tests", admin).allowed).toBe(true);
     expect(resolveAccess("/teacher/import", admin).allowed).toBe(true);
     expect(resolveAccess("/admin/results", admin).allowed).toBe(true);
+  });
+
+  it("keeps scoped admins inside the admin portal only", () => {
+    expect(resolveAccess("/admin", groupAdmin).allowed).toBe(true);
+    expect(resolveAccess("/student/tests", groupAdmin)).toMatchObject({
+      allowed: false,
+      reason: "wrong-portal",
+      roleHome: "/admin"
+    });
   });
 
   it("normalizes Firebase and demo profiles with safe defaults", () => {

@@ -14,8 +14,30 @@ service cloud.firestore {
       return profile().data.role;
     }
 
+    function scopeKeys() {
+      return profile().data.scopeKeys == null ? [] : profile().data.scopeKeys;
+    }
+
     function isAdmin() {
-      return signedIn() && role() == "admin";
+      return isSuperAdmin();
+    }
+
+    function isSuperAdmin() {
+      return signedIn() &&
+        profile().data.status != "blocked" &&
+        (role() in ["admin", "super_admin"] || ("platform:super_admin" in scopeKeys()));
+    }
+
+    function isGroupAdmin(groupId) {
+      return signedIn() &&
+        profile().data.status != "blocked" &&
+        (("group:" + groupId + ":group_admin") in scopeKeys());
+    }
+
+    function isInstituteAdmin(instituteId) {
+      return signedIn() &&
+        profile().data.status != "blocked" &&
+        (("institute:" + instituteId + ":institute_admin") in scopeKeys());
     }
 
     function isTeacher() {
@@ -34,17 +56,74 @@ service cloud.firestore {
       allow create: if signedIn() &&
         request.auth.uid == uid &&
         request.resource.data.role in ["student", "teacher"] &&
-        (
-          (request.resource.data.role == "student" && request.resource.data.status == "active") ||
-          (request.resource.data.role == "teacher" && request.resource.data.status == "pending")
-        );
+        false;
       allow read: if isAdmin() || (signedIn() && request.auth.uid == uid);
       allow update: if isAdmin() || (
         signedIn() &&
         request.auth.uid == uid &&
-        !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "status", "batchIds", "teacherSubjectIds"])
+        (
+          !request.resource.data.diff(resource.data).affectedKeys().hasAny(["role", "status", "batchIds", "teacherSubjectIds", "memberships", "scopeKeys"]) ||
+          (
+            request.resource.data.lastClaimedInviteToken is string &&
+            get(/databases/$(database)/documents/invites/$(request.resource.data.lastClaimedInviteToken)).data.status == "claimed" &&
+            get(/databases/$(database)/documents/invites/$(request.resource.data.lastClaimedInviteToken)).data.claimedBy == request.auth.uid
+          )
+        )
       );
       allow delete: if isAdmin();
+    }
+
+    match /memberships/{id} {
+      allow read: if isSuperAdmin() || (signedIn() && resource.data.userId == request.auth.uid);
+      allow create: if isSuperAdmin() || (
+        signedIn() &&
+        request.resource.data.userId == request.auth.uid &&
+        request.resource.data.inviteToken is string &&
+        get(/databases/$(database)/documents/invites/$(request.resource.data.inviteToken)).data.status == "claimed" &&
+        get(/databases/$(database)/documents/invites/$(request.resource.data.inviteToken)).data.claimedBy == request.auth.uid
+      );
+      allow update, delete: if isSuperAdmin();
+    }
+
+    match /instituteGroups/{id} {
+      allow read: if isSuperAdmin() || isGroupAdmin(id);
+      allow write: if isSuperAdmin();
+    }
+
+    match /institutes/{id} {
+      allow read: if isSuperAdmin() || isInstituteAdmin(id) || (resource.data.groupId is string && isGroupAdmin(resource.data.groupId));
+      allow write: if isSuperAdmin();
+    }
+
+    match /invites/{token} {
+      allow read: if isSuperAdmin() || (signedIn() && resource.data.status == "active");
+      allow create, delete: if isSuperAdmin();
+      allow update: if isSuperAdmin() || (
+        signedIn() &&
+        resource.data.status == "active" &&
+        request.resource.data.status == "claimed" &&
+        request.resource.data.claimedBy == request.auth.uid
+      );
+    }
+
+    match /billingAccounts/{id} {
+      allow read: if isSuperAdmin() ||
+        (resource.data.groupId is string && isGroupAdmin(resource.data.groupId)) ||
+        (resource.data.instituteId is string && isInstituteAdmin(resource.data.instituteId));
+      allow write: if isSuperAdmin();
+    }
+
+    match /creditLedger/{id} {
+      allow read, write: if isSuperAdmin();
+    }
+
+    match /platformSettings/{id} {
+      allow read: if signedIn();
+      allow write: if isSuperAdmin();
+    }
+
+    match /auditLogs/{id} {
+      allow read, write: if isSuperAdmin();
     }
 
     match /exams/{id} {

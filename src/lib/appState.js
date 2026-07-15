@@ -1,4 +1,17 @@
-import { demoUsers, seedBatches, seedQuestions, seedTests } from "../data/catalog.js";
+import {
+  demoUsers,
+  seedAuditLogs,
+  seedBatches,
+  seedBillingAccounts,
+  seedCreditLedger,
+  seedInstituteGroups,
+  seedInstitutes,
+  seedInvites,
+  seedMemberships,
+  seedPlatformSettings,
+  seedQuestions,
+  seedTests
+} from "../data/catalog.js";
 
 export function createSeedState(overrides = {}) {
   return {
@@ -7,6 +20,14 @@ export function createSeedState(overrides = {}) {
     attempts: [],
     imports: [],
     users: demoUsers,
+    memberships: seedMemberships,
+    instituteGroups: seedInstituteGroups,
+    institutes: seedInstitutes,
+    invites: seedInvites,
+    billingAccounts: seedBillingAccounts,
+    creditLedger: seedCreditLedger,
+    platformSettings: seedPlatformSettings,
+    auditLogs: seedAuditLogs,
     batches: seedBatches,
     flags: [],
     ...overrides
@@ -40,6 +61,14 @@ export function mergeRemoteState(remoteState, activeUser) {
     attempts: remoteState.attempts || [],
     imports: remoteState.imports || [],
     users,
+    memberships: remoteState.memberships || seed.memberships,
+    instituteGroups: remoteState.instituteGroups || seed.instituteGroups,
+    institutes: remoteState.institutes || seed.institutes,
+    invites: remoteState.invites || [],
+    billingAccounts: remoteState.billingAccounts || seed.billingAccounts,
+    creditLedger: remoteState.creditLedger || seed.creditLedger,
+    platformSettings: remoteState.platformSettings || seed.platformSettings,
+    auditLogs: remoteState.auditLogs || seed.auditLogs,
     batches: remoteState.batches || [],
     flags: remoteState.flags || []
   };
