@@ -23,45 +23,73 @@ const blankInstitute = {
   contactEmail: ""
 };
 
+const superAdminModules = [
+  { id: "dashboard", label: "Dashboard", short: "D" },
+  { id: "clients", label: "Clients", short: "C" },
+  { id: "invites", label: "Invites", short: "I" },
+  { id: "billing", label: "Billing", short: "B" },
+  { id: "audit", label: "Audit", short: "A" }
+];
+
+function normalizeAdminState(state = {}) {
+  return {
+    ...state,
+    users: Array.isArray(state.users) ? state.users : [],
+    instituteGroups: Array.isArray(state.instituteGroups) ? state.instituteGroups : [],
+    institutes: Array.isArray(state.institutes) ? state.institutes : [],
+    invites: Array.isArray(state.invites) ? state.invites : [],
+    billingAccounts: Array.isArray(state.billingAccounts) ? state.billingAccounts : [],
+    creditLedger: Array.isArray(state.creditLedger) ? state.creditLedger : [],
+    auditLogs: Array.isArray(state.auditLogs) ? state.auditLogs : [],
+    platformSettings: state.platformSettings || {}
+  };
+}
+
 export function SuperAdminPortal({ state, activeUser, actions, adminScope }) {
+  const adminState = useMemo(() => normalizeAdminState(state), [state]);
   const superAdmin = isSuperAdmin(activeUser);
   const [tab, setTab] = useState("dashboard");
-  const billing = useMemo(() => summarizeBillingAccounts(state.billingAccounts, state.creditLedger), [state.billingAccounts, state.creditLedger]);
+  const billing = useMemo(() => summarizeBillingAccounts(adminState.billingAccounts, adminState.creditLedger), [adminState.billingAccounts, adminState.creditLedger]);
+  const scopeLabel = getScopeLabel(adminScope, adminState.instituteGroups, adminState.institutes);
 
   if (!superAdmin) {
-    return <ScopedAdminDashboard state={state} activeUser={activeUser} billing={billing} />;
+    return <ScopedAdminDashboard state={adminState} activeUser={activeUser} billing={billing} />;
   }
 
   return (
-    <section className="page-block super-admin-page">
-      <div className="portal-title super-admin-title">
-        <div>
-          <p className="eyebrow">Super Admin foundation</p>
-          <h1>Ledgr control center</h1>
-          <p>Groups, institutes, admin invites, prepaid credits and important audit history.</p>
+    <section className="super-admin-page">
+      <header className="admin-workspace-header">
+        <div className="admin-title-lockup">
+          <span className="admin-product-mark">L</span>
+          <div>
+            <p className="eyebrow">Super Admin foundation</p>
+            <h1>Ledgr control center</h1>
+            <p>Groups, institutes, admin invites, prepaid credits and audit history.</p>
+          </div>
         </div>
-        <ScopeSwitcher state={state} adminScope={adminScope} actions={actions} />
+        <div className="admin-header-tools">
+          <span className="scope-indicator"><span>Scope</span><strong>{scopeLabel}</strong></span>
+          <ScopeSwitcher state={adminState} adminScope={adminScope} actions={actions} />
+        </div>
+      </header>
+
+      <div className="admin-workspace">
+        <aside className="admin-module-rail" aria-label="Super Admin modules">
+          {superAdminModules.map((module) => (
+            <button key={module.id} className={tab === module.id ? "active" : ""} onClick={() => setTab(module.id)} title={module.label}>
+              <span>{module.short}</span>
+              <strong>{module.label}</strong>
+            </button>
+          ))}
+        </aside>
+        <main className="admin-module-surface">
+          {tab === "dashboard" && <SuperAdminDashboard state={adminState} billing={billing} adminScope={adminScope} />}
+          {tab === "clients" && <ClientManager state={adminState} actions={actions} />}
+          {tab === "invites" && <InviteManager state={adminState} actions={actions} />}
+          {tab === "billing" && <BillingManager state={adminState} actions={actions} billing={billing} />}
+          {tab === "audit" && <AuditLog state={adminState} />}
+        </main>
       </div>
-      <div className="scope-banner">
-        <strong>Current scope:</strong>
-        <span>{getScopeLabel(adminScope, state.instituteGroups, state.institutes)}</span>
-      </div>
-      <div className="segmented-control admin-tabs" aria-label="Super Admin modules">
-        {[
-          ["dashboard", "Dashboard"],
-          ["clients", "Clients"],
-          ["invites", "Invites"],
-          ["billing", "Billing"],
-          ["audit", "Audit"]
-        ].map(([id, label]) => (
-          <button key={id} className={tab === id ? "active" : ""} onClick={() => setTab(id)}>{label}</button>
-        ))}
-      </div>
-      {tab === "dashboard" && <SuperAdminDashboard state={state} billing={billing} adminScope={adminScope} />}
-      {tab === "clients" && <ClientManager state={state} actions={actions} />}
-      {tab === "invites" && <InviteManager state={state} actions={actions} />}
-      {tab === "billing" && <BillingManager state={state} actions={actions} billing={billing} />}
-      {tab === "audit" && <AuditLog state={state} />}
     </section>
   );
 }
@@ -70,7 +98,7 @@ function ScopeSwitcher({ state, adminScope, actions }) {
   const value = scopeValue(adminScope);
   const instituteOptions = state.institutes.map((institute) => [scopeValue({ scopeType: "institute", groupId: institute.groupId || null, instituteId: institute.id }), institute.name]);
   return (
-    <label className="field compact-field">
+    <label className="field compact-field scope-select-field">
       <span>View scope</span>
       <select value={value} onChange={(event) => actions.setAdminScope(parseScopeValue(event.target.value, state.institutes))}>
         <option value="platform">All Ledgr</option>
@@ -102,13 +130,11 @@ function SuperAdminDashboard({ state, billing, adminScope }) {
         <Metric label="Active invites" value={activeInvites} />
         <Metric label="Low credit clients" value={lowCredit} />
       </div>
-      <div className="admin-grid two">
-        <section className="section-panel">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">Clients</p>
-              <h2>Groups and institutes</h2>
-            </div>
+      <div className="admin-grid two dashboard-lists">
+        <section className="section-panel compact-panel">
+          <div className="compact-panel-head">
+            <p className="eyebrow">Clients</p>
+            <h3>Groups and institutes</h3>
           </div>
           <div className="mini-table">
             {scopedGroups.map((group) => (
@@ -119,12 +145,10 @@ function SuperAdminDashboard({ state, billing, adminScope }) {
             ))}
           </div>
         </section>
-        <section className="section-panel">
-          <div className="section-head">
-            <div>
-              <p className="eyebrow">Billing</p>
-              <h2>Credit status</h2>
-            </div>
+        <section className="section-panel compact-panel">
+          <div className="compact-panel-head">
+            <p className="eyebrow">Billing</p>
+            <h3>Credit status</h3>
           </div>
           <div className="mini-table">
             {scopedBilling.map((account) => (

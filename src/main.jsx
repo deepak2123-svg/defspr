@@ -40,7 +40,7 @@ const STORE_KEY = "ledgr-test-v1";
 const USER_KEY = "ledgr-test-user-v2";
 
 function initialState() {
-  return loadState(STORE_KEY, createSeedState());
+  return createSeedState(loadState(STORE_KEY, {}));
 }
 
 function App() {
@@ -430,7 +430,7 @@ function App() {
   return (
     <div className="app-shell">
       <TopBar activeUser={activeUser} actions={actions} navigate={navigate} path={path} />
-      <main className="app-main">
+      <main className={`app-main${isAdminRoute(path) ? " admin-app-main" : ""}`}>
         <DataStatusBanner dataStatus={dataStatus} />
         {renderRoute(path, { state, activeUser, actions, dataStatus, adminScope })}
       </main>
@@ -462,6 +462,10 @@ function renderRoute(path, ctx) {
   return <Landing {...ctx} />;
 }
 
+function isAdminRoute(path) {
+  return path === "/admin" || path.startsWith("/admin/");
+}
+
 function DataStatusBanner({ dataStatus }) {
   if (!dataStatus?.message || dataStatus.mode === "firebase") return null;
   return (
@@ -475,9 +479,10 @@ function DataStatusBanner({ dataStatus }) {
 function TopBar({ activeUser, actions, navigate, path }) {
   const roleHome = getRoleHome(activeUser);
   const roleLabel = roles[activeUser?.role]?.label;
+  const adminSurface = isAdminRoute(path);
 
   return (
-    <header className="topbar">
+    <header className={`topbar${adminSurface ? " admin-topbar" : ""}`}>
       <button className="brand-mark" onClick={() => navigate("/")} aria-label="Ledgr Test home">
         <span>Ledgr</span>
         <strong>Test</strong>
