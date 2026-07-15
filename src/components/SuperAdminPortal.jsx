@@ -5,7 +5,6 @@ import { normalizeUserProfile } from "../lib/access.js";
 import { canReadInstitute, getPrimaryAdminMembership, isSuperAdmin } from "../lib/memberships.js";
 import {
   getInviteStatus,
-  getScopeLabel,
   makeId,
   parseInstituteCsv,
   summarizeBillingAccounts
@@ -24,7 +23,7 @@ const blankInstitute = {
 };
 
 const superAdminModules = [
-  { id: "dashboard", label: "Dashboard", icon: "dashboard" },
+  { id: "dashboard", label: "Overview", icon: "dashboard" },
   { id: "clients", label: "Clients", icon: "clients" },
   { id: "invites", label: "Invites", icon: "invites" },
   { id: "billing", label: "Billing", icon: "billing" },
@@ -74,6 +73,12 @@ const iconPaths = {
       <circle cx="15" cy="15" r="3" />
     </>
   ),
+  search: (
+    <>
+      <circle cx="11" cy="11" r="5" />
+      <path d="m15 15 4 4" />
+    </>
+  ),
   signout: (
     <>
       <path d="M10 6H6a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h4" />
@@ -89,6 +94,37 @@ function RailIcon({ name }) {
       {iconPaths[name]}
     </svg>
   );
+}
+
+function getInitials(user) {
+  const source = user?.name || user?.email || "Ledgr Admin";
+  return source
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((part) => part[0]?.toUpperCase())
+    .join("") || "LA";
+}
+
+function buildClientRows(state, billing) {
+  const billingByInstitute = new Map(billing.filter((account) => account.instituteId).map((account) => [account.instituteId, account]));
+  const groups = new Map(state.instituteGroups.map((group) => [group.id, group]));
+  return state.institutes.map((institute) => {
+    const account = billingByInstitute.get(institute.id);
+    const purchased = Number(account?.purchasedCredits || 0);
+    const remaining = Number(account?.remainingCredits || 0);
+    const used = Math.max(0, purchased - remaining);
+    const completion = purchased ? Math.round((used / purchased) * 100) : 0;
+    const group = institute.groupId ? groups.get(institute.groupId) : null;
+    return {
+      id: institute.id,
+      name: institute.name,
+      meta: [institute.city || group?.name || "Setup pending", institute.status || "active"].filter(Boolean).join(" · "),
+      used,
+      purchased,
+      completion
+    };
+  });
 }
 
 function normalizeAdminState(state = {}) {
@@ -109,72 +145,99 @@ export function SuperAdminPortal({ state, activeUser, actions, adminScope }) {
   const adminState = useMemo(() => normalizeAdminState(state), [state]);
   const superAdmin = isSuperAdmin(activeUser);
   const [tab, setTab] = useState("dashboard");
+  const [clientSearch, setClientSearch] = useState("");
   const billing = useMemo(() => summarizeBillingAccounts(adminState.billingAccounts, adminState.creditLedger), [adminState.billingAccounts, adminState.creditLedger]);
-  const scopeLabel = getScopeLabel(adminScope, adminState.instituteGroups, adminState.institutes);
+  const activeModule = superAdminModules.find((module) => module.id === tab) || superAdminModules[0];
+  const clientRows = useMemo(() => buildClientRows(adminState, billing), [adminState, billing]);
+  const visibleClientRows = clientRows.filter((row) => `${row.name} ${row.meta}`.toLowerCase().includes(clientSearch.trim().toLowerCase())).slice(0, 18);
 
   if (!superAdmin) {
     return <ScopedAdminDashboard state={adminState} activeUser={activeUser} billing={billing} />;
   }
 
   return (
-    <section className="super-admin-page">
-      <header className="admin-workspace-header">
-        <div className="admin-title-lockup">
+    <section className="admin-reference-shell">
+      <header className="admin-reference-topbar">
+        <div className="admin-reference-brand">
           <span className="admin-product-mark">L</span>
-          <div>
-            <p className="eyebrow">Super Admin foundation</p>
-            <h1>Ledgr control center</h1>
-            <p>Groups, institutes, admin invites, prepaid credits and audit history.</p>
-          </div>
+          <strong>{activeModule.label}</strong>
         </div>
-        <div className="admin-header-tools">
-          <span className="scope-indicator"><span>Scope</span><strong>{scopeLabel}</strong></span>
-          <ScopeSwitcher state={adminState} adminScope={adminScope} actions={actions} />
+        <div className="admin-reference-actions">
+          <button className="admin-report-button" onClick={() => setTab("audit")}>
+            <RailIcon name="billing" />
+            <span>Ledgr Report</span>
+          </button>
+          <span className="admin-avatar">{getInitials(activeUser)}</span>
+          <strong className="admin-user-name">{activeUser?.name || "Ledgr Admin"}</strong>
         </div>
       </header>
 
-      <div className="admin-workspace">
-        <aside className="admin-module-rail" aria-label="Super Admin modules">
-          {superAdminModules.map((module) => (
-            <button key={module.id} className={tab === module.id ? "active" : ""} onClick={() => setTab(module.id)} title={module.label}>
-              <RailIcon name={module.icon} />
-              <strong>{module.label}</strong>
+      <aside className="admin-reference-rail" aria-label="Super Admin modules">
+        {superAdminModules.map((module) => (
+          <button key={module.id} className={tab === module.id ? "active" : ""} onClick={() => setTab(module.id)} title={module.label}>
+            <RailIcon name={module.icon} />
+            <strong>{module.label}</strong>
+          </button>
+        ))}
+        <span className="admin-rail-spacer" aria-hidden="true" />
+        <button className="admin-rail-action" onClick={actions.signOut} title="Sign out">
+          <RailIcon name="signout" />
+          <strong>Sign out</strong>
+        </button>
+      </aside>
+
+      <aside className="admin-client-panel">
+        <div className="admin-panel-topline">
+          <strong>{adminState.institutes.length} institutes · today</strong>
+          <span>{activeModule.label}</span>
+        </div>
+        <label className="admin-search-box">
+          <RailIcon name="search" />
+          <input value={clientSearch} onChange={(event) => setClientSearch(event.target.value)} placeholder="Search institutes" />
+        </label>
+        <div className="admin-panel-chip">Choose an institute to load</div>
+        <div className="admin-client-list">
+          {visibleClientRows.map((row) => (
+            <button className="admin-client-row" key={row.id}>
+              <span className="admin-client-dot" />
+              <span className="admin-client-copy">
+                <strong>{row.name}</strong>
+                <small>{row.meta}</small>
+              </span>
+              <span className="admin-client-count">{row.used}/{row.purchased || 0}</span>
+              <span className="admin-client-percent">{row.completion}%</span>
             </button>
           ))}
-          <span className="admin-rail-spacer" aria-hidden="true" />
-          <button className="admin-rail-action" onClick={actions.signOut} title="Sign out">
-            <RailIcon name="signout" />
-            <strong>Sign out</strong>
-          </button>
-        </aside>
-        <main className="admin-module-surface">
-          {tab === "dashboard" && <SuperAdminDashboard state={adminState} billing={billing} adminScope={adminScope} />}
-          {tab === "clients" && <ClientManager state={adminState} actions={actions} />}
-          {tab === "invites" && <InviteManager state={adminState} actions={actions} />}
-          {tab === "billing" && <BillingManager state={adminState} actions={actions} billing={billing} />}
-          {tab === "audit" && <AuditLog state={adminState} />}
-        </main>
-      </div>
-    </section>
-  );
-}
+          {!visibleClientRows.length && <p className="admin-empty-note">No institutes match this scope yet.</p>}
+        </div>
+      </aside>
 
-function ScopeSwitcher({ state, adminScope, actions }) {
-  const value = scopeValue(adminScope);
-  const instituteOptions = state.institutes.map((institute) => [scopeValue({ scopeType: "institute", groupId: institute.groupId || null, instituteId: institute.id }), institute.name]);
-  return (
-    <label className="field compact-field scope-select-field">
-      <span>View scope</span>
-      <select value={value} onChange={(event) => actions.setAdminScope(parseScopeValue(event.target.value, state.institutes))}>
-        <option value="platform">All Ledgr</option>
-        {state.instituteGroups.map((group) => (
-          <option key={group.id} value={scopeValue({ scopeType: "group", groupId: group.id })}>{group.name}</option>
-        ))}
-        {instituteOptions.map(([optionValue, label]) => (
-          <option key={optionValue} value={optionValue}>{label}</option>
-        ))}
-      </select>
-    </label>
+      <aside className="admin-context-panel">
+        <div className="admin-context-intro">
+          <p className="eyebrow">Overview</p>
+          <h2>No institute selected</h2>
+          <p>Choose an institute from the left to load classes, teachers, and timeline.</p>
+        </div>
+        <div className="admin-context-cards">
+          <Metric label="Institutes" value={filterInstitutes(adminState, adminScope).length} />
+          <Metric label="Groups" value={filterGroups(adminState, adminScope).length} />
+          <Metric label="Credits left" value={billing.reduce((sum, account) => sum + Number(account.remainingCredits || 0), 0)} />
+          <Metric label="Active invites" value={adminState.invites.filter((invite) => getInviteStatus(invite) === "active").length} />
+        </div>
+        <button className="admin-context-report" onClick={() => setTab("audit")}>
+          <RailIcon name="billing" />
+          <span>Open Ledgr Report</span>
+        </button>
+      </aside>
+
+      <main className="admin-main-panel">
+        {tab === "dashboard" && <SuperAdminDashboard state={adminState} billing={billing} adminScope={adminScope} />}
+        {tab === "clients" && <ModuleSurface eyebrow="Clients" title="Groups and institutes"><ClientManager state={adminState} actions={actions} /></ModuleSurface>}
+        {tab === "invites" && <ModuleSurface eyebrow="Invites" title="Admin invite links"><InviteManager state={adminState} actions={actions} /></ModuleSurface>}
+        {tab === "billing" && <ModuleSurface eyebrow="Billing" title="Credit and payment ledger"><BillingManager state={adminState} actions={actions} billing={billing} /></ModuleSurface>}
+        {tab === "audit" && <ModuleSurface eyebrow="Audit" title="Important Super Admin actions"><AuditLog state={adminState} /></ModuleSurface>}
+      </main>
+    </section>
   );
 }
 
@@ -184,48 +247,40 @@ function SuperAdminDashboard({ state, billing, adminScope }) {
   const scopedBilling = filterBilling(state, adminScope, billing);
   const remainingCredits = scopedBilling.reduce((sum, account) => sum + Number(account.remainingCredits || 0), 0);
   const activeInvites = state.invites.filter((invite) => getInviteStatus(invite) === "active").length;
-  const lowCredit = scopedBilling.filter((account) => account.purchasedCredits > 0 && account.remainingCredits / account.purchasedCredits <= 0.2).length;
 
   return (
-    <>
-      <div className="metric-strip">
-        <Metric label="Groups" value={scopedGroups.length} />
-        <Metric label="Institutes" value={scopedInstitutes.length} />
-        <Metric label="Credits left" value={remainingCredits} />
-        <Metric label="Active invites" value={activeInvites} />
-        <Metric label="Low credit clients" value={lowCredit} />
+    <section className="admin-overview-panel">
+      <div className="admin-overview-heading">
+        <p className="eyebrow">Overview</p>
+        <h1>Admin dashboard</h1>
+        <p>No institute is open. Select an institute from the left to load live class and teacher timelines.</p>
       </div>
-      <div className="admin-grid two dashboard-lists">
-        <section className="section-panel compact-panel">
-          <div className="compact-panel-head">
-            <p className="eyebrow">Clients</p>
-            <h3>Groups and institutes</h3>
-          </div>
-          <div className="mini-table">
-            {scopedGroups.map((group) => (
-              <div className="mini-row" key={group.id}><strong>{group.name}</strong><span>{state.institutes.filter((item) => item.groupId === group.id).length} institutes</span></div>
-            ))}
-            {state.institutes.filter((item) => !item.groupId).map((institute) => (
-              <div className="mini-row" key={institute.id}><strong>{institute.name}</strong><span>standalone institute</span></div>
-            ))}
-          </div>
-        </section>
-        <section className="section-panel compact-panel">
-          <div className="compact-panel-head">
-            <p className="eyebrow">Billing</p>
-            <h3>Credit status</h3>
-          </div>
-          <div className="mini-table">
-            {scopedBilling.map((account) => (
-              <div className="mini-row" key={account.id}>
-                <strong>{billingOwnerLabel(account, state)}</strong>
-                <span>{account.remainingCredits}/{account.purchasedCredits} left</span>
-              </div>
-            ))}
-          </div>
-        </section>
+      <div className="admin-overview-stats">
+        <Metric label="Institutes" value={scopedInstitutes.length} tone="blue" />
+        <Metric label="Groups" value={scopedGroups.length} tone="blue" />
+        <Metric label="Credits left" value={remainingCredits} tone="green" />
+        <Metric label="Active invites" value={activeInvites} tone="green" />
       </div>
-    </>
+      <section className="admin-start-card">
+        <h2>Choose an institute to begin</h2>
+        <p>
+          The overview stays lightweight on first load. Once you click an institute, Ledgr loads that institute's
+          setup, billing, invite, and admin timeline views.
+        </p>
+      </section>
+    </section>
+  );
+}
+
+function ModuleSurface({ eyebrow, title, children }) {
+  return (
+    <section className="admin-module-card">
+      <div className="admin-overview-heading">
+        <p className="eyebrow">{eyebrow}</p>
+        <h1>{title}</h1>
+      </div>
+      {children}
+    </section>
   );
 }
 
@@ -562,9 +617,9 @@ function InstituteFields({ draft, setDraft }) {
   );
 }
 
-function Metric({ label, value }) {
+function Metric({ label, value, tone = "" }) {
   return (
-    <div className="metric">
+    <div className={`metric${tone ? ` ${tone}` : ""}`}>
       <strong>{value}</strong>
       <span>{label}</span>
     </div>
@@ -597,22 +652,6 @@ function filterBilling(state, scope, billing) {
     return billing.filter((account) => account.instituteId === scope.instituteId || account.groupId === institute?.groupId);
   }
   return billing;
-}
-
-function scopeValue(scope = { scopeType: "platform" }) {
-  if (scope.scopeType === "group") return `group:${scope.groupId}`;
-  if (scope.scopeType === "institute") return `institute:${scope.instituteId}`;
-  return "platform";
-}
-
-function parseScopeValue(value, institutes) {
-  if (value.startsWith("group:")) return { scopeType: "group", groupId: value.slice(6), instituteId: null };
-  if (value.startsWith("institute:")) {
-    const instituteId = value.slice(10);
-    const institute = institutes.find((item) => item.id === instituteId);
-    return { scopeType: "institute", groupId: institute?.groupId || null, instituteId };
-  }
-  return { scopeType: "platform", groupId: null, instituteId: null };
 }
 
 function billingOwnerLabel(account, state) {

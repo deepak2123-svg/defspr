@@ -294,7 +294,431 @@ button:disabled {
 .admin-app-main {
   width: 100%;
   margin: 0;
-  padding: 16px 16px 56px;
+  min-height: 100vh;
+  background: #f3f6fb;
+  padding: 0;
+}
+
+.admin-reference-shell {
+  display: grid;
+  grid-template-areas:
+    "topbar topbar topbar topbar"
+    "rail clients context main";
+  grid-template-columns: 56px 360px 430px minmax(0, 1fr);
+  grid-template-rows: 56px minmax(0, calc(100vh - 56px));
+  min-height: 100vh;
+  background: #f3f6fb;
+  color: #111827;
+  overflow: hidden;
+}
+
+.admin-reference-topbar {
+  grid-area: topbar;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 1rem;
+  align-items: center;
+  height: 56px;
+  border-bottom: 1px solid #263244;
+  background: #101827;
+  color: #fff;
+  padding: 0 16px 0 12px;
+}
+
+.admin-reference-brand,
+.admin-reference-actions {
+  display: flex;
+  gap: 0.9rem;
+  align-items: center;
+}
+
+.admin-reference-actions {
+  grid-column: 3;
+  justify-self: end;
+}
+
+.admin-reference-brand strong {
+  font-size: 0.92rem;
+  font-weight: 800;
+}
+
+.admin-report-button {
+  display: inline-flex;
+  gap: 0.45rem;
+  align-items: center;
+  min-height: 38px;
+  border: 1px solid #c8d8f6;
+  border-radius: 8px;
+  background: #eef5ff;
+  color: #255bd8;
+  padding: 0 0.85rem;
+  font-weight: 800;
+}
+
+.admin-report-button .admin-module-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-avatar {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 999px;
+  background: #147f77;
+  color: #fff;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.admin-user-name {
+  color: #d5dae4;
+  font-size: 0.86rem;
+}
+
+.admin-reference-rail {
+  grid-area: rail;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  height: calc(100vh - 56px);
+  background: #0b111b;
+  padding: 10px 7px;
+}
+
+.admin-reference-rail button {
+  display: grid;
+  place-items: center;
+  width: 42px;
+  min-height: 42px;
+  border: 1px solid #263244;
+  border-radius: 9px;
+  background: #141b27;
+  color: #c6cedb;
+  padding: 0;
+}
+
+.admin-reference-rail button:hover,
+.admin-reference-rail button.active {
+  border-color: #3167c8;
+  background: #1a365c;
+  color: #fff;
+}
+
+.admin-reference-rail .admin-rail-action {
+  border-color: #4a1f26;
+  background: #2a1118;
+  color: #ffb7b7;
+}
+
+.admin-reference-rail .admin-rail-action:hover {
+  border-color: #ef4444;
+  background: #471722;
+  color: #fff;
+}
+
+.admin-reference-rail button strong {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+.admin-client-panel,
+.admin-context-panel,
+.admin-main-panel {
+  height: calc(100vh - 56px);
+  overflow: auto;
+}
+
+.admin-client-panel {
+  grid-area: clients;
+  border-right: 1px solid #dbe3ee;
+  background: #fff;
+  padding: 16px 16px 20px;
+}
+
+.admin-panel-topline {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.8rem;
+  align-items: center;
+  margin-bottom: 12px;
+  color: #6b7280;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.admin-panel-topline strong {
+  color: #6b7280;
+}
+
+.admin-search-box {
+  display: flex;
+  gap: 0.55rem;
+  align-items: center;
+  min-height: 44px;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  background: #f7f9fc;
+  padding: 0 0.75rem;
+}
+
+.admin-search-box span {
+  color: #8b95a5;
+}
+
+.admin-search-box .admin-module-icon {
+  width: 16px;
+  height: 16px;
+  color: #8b95a5;
+}
+
+.admin-search-box input {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #111827;
+  outline: 0;
+}
+
+.admin-panel-chip {
+  display: inline-flex;
+  margin: 32px 0 14px 6px;
+  border: 1px solid #dbe3ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #6b7280;
+  padding: 0.45rem 0.7rem;
+  font-family: "JetBrains Mono", ui-monospace, monospace;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.admin-client-list {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.admin-client-row {
+  display: grid;
+  grid-template-columns: 10px minmax(0, 1fr) auto auto;
+  gap: 0.65rem;
+  align-items: center;
+  min-height: 56px;
+  border: 0;
+  border-radius: 10px;
+  background: #fff;
+  padding: 0.45rem 0.65rem;
+  text-align: left;
+}
+
+.admin-client-row:hover {
+  background: #f8fafc;
+}
+
+.admin-client-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 999px;
+  background: #ff424d;
+}
+
+.admin-client-copy {
+  display: grid;
+  gap: 0.12rem;
+  min-width: 0;
+}
+
+.admin-client-copy strong,
+.admin-client-copy small {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.admin-client-copy strong {
+  color: #111827;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.admin-client-copy small {
+  color: #6b7280;
+  font-size: 0.72rem;
+}
+
+.admin-client-count {
+  border-radius: 999px;
+  background: #fff0f2;
+  color: #e11d2e;
+  padding: 0.28rem 0.55rem;
+  font-size: 0.8rem;
+  font-weight: 800;
+}
+
+.admin-client-percent {
+  color: #e11d2e;
+  font-size: 0.78rem;
+  font-weight: 800;
+}
+
+.admin-empty-note {
+  color: #6b7280;
+  padding: 0.8rem;
+}
+
+.admin-context-panel {
+  grid-area: context;
+  border-right: 1px solid #dbe3ee;
+  background: #fff;
+  padding: 22px 16px;
+}
+
+.admin-context-intro {
+  display: grid;
+  gap: 0.35rem;
+  border-bottom: 1px solid #e5ebf3;
+  margin: -2px -16px 16px;
+  padding: 2px 18px 16px;
+}
+
+.admin-context-intro h2 {
+  color: #111827;
+  font-size: 1.7rem;
+  letter-spacing: 0;
+}
+
+.admin-context-intro p:not(.eyebrow) {
+  max-width: 360px;
+  color: #4b5563;
+  line-height: 1.45;
+}
+
+.admin-context-cards {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.admin-context-cards .metric {
+  min-height: 94px;
+}
+
+.admin-context-report {
+  display: inline-flex;
+  justify-content: center;
+  gap: 0.45rem;
+  align-items: center;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 0.9rem;
+  border: 1px solid #c8d8f6;
+  border-radius: 8px;
+  background: #eef5ff;
+  color: #255bd8;
+  font-weight: 800;
+}
+
+.admin-context-report .admin-module-icon {
+  width: 16px;
+  height: 16px;
+}
+
+.admin-main-panel {
+  grid-area: main;
+  background: #f3f6fb;
+  padding: 22px 24px;
+}
+
+.admin-overview-panel,
+.admin-module-card {
+  display: grid;
+  gap: 1rem;
+}
+
+.admin-overview-heading {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.admin-overview-heading h1 {
+  color: #111827;
+  font-size: clamp(1.9rem, 3vw, 2.45rem);
+  letter-spacing: 0;
+}
+
+.admin-overview-heading p:not(.eyebrow) {
+  color: #4b5563;
+}
+
+.admin-overview-stats {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.metric.blue {
+  border-color: #bdd3f4;
+  background: #eaf2ff;
+}
+
+.metric.green {
+  border-color: #aae8c9;
+  background: #ebfff4;
+}
+
+.admin-start-card {
+  display: grid;
+  gap: 0.65rem;
+  max-width: none;
+  border: 1px solid #dbe3ee;
+  border-radius: 10px;
+  background: #fff;
+  padding: 1.6rem;
+}
+
+.admin-start-card h2 {
+  color: #111827;
+  font-size: 1.45rem;
+  letter-spacing: 0;
+}
+
+.admin-start-card p {
+  max-width: 650px;
+  color: #4b5563;
+}
+
+@media (max-width: 1360px) {
+  .admin-reference-shell {
+    grid-template-columns: 56px 320px 360px minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 1120px) {
+  .admin-reference-shell {
+    grid-template-areas:
+      "topbar topbar"
+      "rail main";
+    grid-template-columns: 56px minmax(0, 1fr);
+  }
+
+  .admin-client-panel,
+  .admin-context-panel {
+    display: none;
+  }
+
+  .admin-overview-stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 .data-status {
@@ -1467,7 +1891,51 @@ a:focus-visible {
   }
 
   .admin-app-main {
-    padding: 10px 10px 48px;
+    padding: 0;
+  }
+
+  .admin-reference-shell {
+    grid-template-areas:
+      "topbar"
+      "rail"
+      "main";
+    grid-template-columns: 1fr;
+    grid-template-rows: auto auto 1fr;
+    min-height: 100vh;
+    overflow: auto;
+  }
+
+  .admin-reference-topbar {
+    grid-template-columns: 1fr;
+    height: auto;
+    gap: 0.7rem;
+    padding: 0.75rem;
+  }
+
+  .admin-reference-actions {
+    grid-column: 1;
+    justify-self: start;
+    flex-wrap: wrap;
+  }
+
+  .admin-reference-rail {
+    position: sticky;
+    top: 0;
+    z-index: 30;
+    flex-direction: row;
+    height: auto;
+    min-height: 0;
+    overflow-x: auto;
+  }
+
+  .admin-main-panel {
+    height: auto;
+    overflow: visible;
+    padding: 1rem;
+  }
+
+  .admin-overview-stats {
+    grid-template-columns: 1fr;
   }
 
   .session-chip {
