@@ -10,7 +10,7 @@ import {
 } from "./data/catalog.js";
 import { InviteClaim, SuperAdminPortal, buildGroupFromDraft, buildInstituteFromDraft } from "./components/SuperAdminPortal.jsx";
 import { getRoleHome, normalizeUserProfile, portalHome, portalLogin, resolveAccess } from "./lib/access.js";
-import { createSeedState, replaceByUid, shouldUseFirestoreData, upsertById } from "./lib/appState.js";
+import { createSeedState, isDemoUser, replaceByUid, shouldUseFirestoreData, upsertById } from "./lib/appState.js";
 import { isFirebaseConfigured, ensureUserProfile, listenToAuth, signInWithEmail, signInWithGoogle, signOutCurrentUser, signUpWithEmail } from "./lib/firebase.js";
 import {
   addFlagToFirestore,
@@ -69,8 +69,17 @@ function App() {
     listenToAuth(async (firebaseUser) => {
       if (cancelled || !firebaseUser) return;
       try {
-        const profile = normalizeUserProfile(await ensureUserProfile(firebaseUser, "student", "", { createIfMissing: false }), "student");
-        setActiveUser((current) => current || profile);
+        const remoteProfile = await ensureUserProfile(firebaseUser, "student", "", { createIfMissing: false });
+        const profile = normalizeUserProfile({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          ...remoteProfile
+        }, "student");
+        setActiveUser((current) => {
+          if (current && isDemoUser(current) && current.uid !== profile.uid) return current;
+          return profile;
+        });
       } catch (error) {
         setDataStatus({ mode: "error", message: error.message });
       }
