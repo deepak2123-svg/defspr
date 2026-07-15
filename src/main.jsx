@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   demoUsers,
@@ -35,6 +35,7 @@ function App() {
   const [path, setPath] = useState(window.location.pathname);
   const [activeUser, setActiveUser] = useState(() => loadState(USER_KEY, null));
   const [state, setState] = useState(initialState);
+  const [demoOpen, setDemoOpen] = useState(false);
   const [dataStatus, setDataStatus] = useState({ mode: isFirebaseConfigured ? "firebase-ready" : "local", message: "" });
   const remoteDataEnabled = shouldUseFirestoreData(activeUser, isFirebaseConfigured);
 
@@ -182,17 +183,23 @@ function App() {
           setActiveUser(null);
           navigate("/");
         }
+      },
+      openDemo() {
+        setDemoOpen(true);
+      },
+      closeDemo() {
+        setDemoOpen(false);
       }
     }),
     [activeUser?.uid, remoteDataEnabled]
   );
 
   return (
-    <div className="app-shell">
+    <div className={`app-shell ${path === "/" && !activeUser ? "public-home" : ""}`}>
       <TopBar activeUser={activeUser} actions={actions} navigate={navigate} path={path} />
       <main className="app-main">
         <DataStatusBanner dataStatus={dataStatus} />
-        {renderRoute(path, { state, activeUser, actions, dataStatus })}
+        {renderRoute(path, { state, activeUser, actions, dataStatus, demoOpen })}
       </main>
     </div>
   );
@@ -235,6 +242,86 @@ function DataStatusBanner({ dataStatus }) {
 function TopBar({ activeUser, actions, navigate, path }) {
   const roleHome = getRoleHome(activeUser);
   const roleLabel = roles[activeUser?.role]?.label;
+  const [portalOpen, setPortalOpen] = useState(false);
+  const portalRef = useRef(null);
+
+  useEffect(() => {
+    if (!portalOpen) return undefined;
+
+    const onPointerDown = (event) => {
+      if (!portalRef.current?.contains(event.target)) setPortalOpen(false);
+    };
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") setPortalOpen(false);
+    };
+
+    document.addEventListener("pointerdown", onPointerDown);
+    document.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", onPointerDown);
+      document.removeEventListener("keydown", onKeyDown);
+    };
+  }, [portalOpen]);
+
+  const go = (to) => {
+    setPortalOpen(false);
+    navigate(to);
+  };
+
+  if (path === "/" && !activeUser) {
+    return (
+      <header className="topbar site-topbar">
+        <button className="site-brand" type="button" onClick={() => go("/")} aria-label="Ledgr Classes home">
+          <span className="site-brand-mark">L</span>
+          <span className="site-brand-name">Ledgr Classes</span>
+        </button>
+
+        <nav className="site-nav" aria-label="Primary navigation">
+          <a className="site-nav-link" href="#products">Products</a>
+          <button className="site-button site-button-primary" type="button" onClick={actions.openDemo}>Book a demo</button>
+          <div className="site-portal-wrap" ref={portalRef}>
+            <button
+              className="site-button site-button-outline"
+              type="button"
+              aria-expanded={portalOpen}
+              aria-controls="portalMenu"
+              onClick={() => setPortalOpen((open) => !open)}
+            >
+              Login
+            </button>
+            <div className={`site-portal-menu ${portalOpen ? "open" : ""}`} id="portalMenu" role="menu">
+              <div className="site-portal-group">
+                <span className="site-portal-group-label">ClassLog</span>
+                <a href="https://teacher.ledgrclasses.com/" role="menuitem">
+                  <span className="site-mini-icon">T</span>
+                  <span><strong>Teacher App</strong><span>Daily class logging</span></span>
+                </a>
+                <a href="https://admin.ledgrclasses.com/" role="menuitem">
+                  <span className="site-mini-icon">A</span>
+                  <span><strong>Admin Panel</strong><span>Institute control centre</span></span>
+                </a>
+              </div>
+              <div className="site-portal-group">
+                <span className="site-portal-group-label">Mock Tests</span>
+                <button type="button" role="menuitem" onClick={() => go("/student-login")}>
+                  <span className="site-mini-icon test">S</span>
+                  <span><strong>Student Portal</strong><span>Test attempts</span></span>
+                </button>
+                <button type="button" role="menuitem" onClick={() => go("/teacher-login")}>
+                  <span className="site-mini-icon test">Q</span>
+                  <span><strong>Teacher Workspace</strong><span>Question import</span></span>
+                </button>
+                <button type="button" role="menuitem" onClick={() => go("/admin-login")}>
+                  <span className="site-mini-icon test">M</span>
+                  <span><strong>Admin Console</strong><span>Publishing and results</span></span>
+                </button>
+              </div>
+            </div>
+          </div>
+        </nav>
+      </header>
+    );
+  }
 
   return (
     <header className="topbar">
@@ -276,53 +363,199 @@ function TopBar({ activeUser, actions, navigate, path }) {
   );
 }
 
-function Landing({ state, actions }) {
-  const liveQuestions = state.questions.filter((question) => question.status === "published").length;
-  const firebaseLabel = isFirebaseConfigured ? "Firebase connected" : "Firebase pending";
+function Landing({ state, actions, demoOpen }) {
+  const [leadForm, setLeadForm] = useState({
+    name: "",
+    phone: "",
+    instituteName: "",
+    message: "",
+    website: ""
+  });
+  const [formStatus, setFormStatus] = useState({ tone: "", message: "" });
+  const publishedQuestions = state.questions.filter((question) => question.status === "published").length;
+  const registerDate = useMemo(
+    () => new Intl.DateTimeFormat("en-IN", { weekday: "short", day: "2-digit", month: "short" }).format(new Date()),
+    []
+  );
+
+  useEffect(() => {
+    document.body.classList.toggle("modal-open", demoOpen);
+    return () => document.body.classList.remove("modal-open");
+  }, [demoOpen]);
+
+  useEffect(() => {
+    if (!demoOpen) return undefined;
+    const onKeyDown = (event) => {
+      if (event.key === "Escape") actions.closeDemo();
+    };
+    document.addEventListener("keydown", onKeyDown);
+    return () => document.removeEventListener("keydown", onKeyDown);
+  }, [actions, demoOpen]);
+
+  const updateLeadForm = (field, value) => {
+    setLeadForm((current) => ({ ...current, [field]: value }));
+    if (formStatus.message) setFormStatus({ tone: "", message: "" });
+  };
+
+  const submitLead = (event) => {
+    event.preventDefault();
+    if (leadForm.website) return;
+    if (!leadForm.name.trim() || !leadForm.phone.trim() || !leadForm.instituteName.trim()) {
+      setFormStatus({ tone: "error", message: "Please add your name, phone and institute name." });
+      return;
+    }
+    setLeadForm({ name: "", phone: "", instituteName: "", message: "", website: "" });
+    setFormStatus({ tone: "success", message: "Thanks. We received your request and will get back to you." });
+  };
 
   return (
-    <section className="landing gateway-landing">
-      <div className="hero-panel gateway-hero">
-        <p className="eyebrow">Mock tests for NDA, NEET, JEE Main and JEE Advanced</p>
-        <h1>Start from the right Ledgr Test gateway.</h1>
-        <p className="lede">
-          Students enter a focused test-taking portal. Teachers enter a separate question-bank workspace.
-          NDA is live first, while NEET and JEE shells are prepared for future content.
-        </p>
-        <div className="hero-actions">
-          <button className="primary" onClick={() => actions.navigate("/student-login")}>Student gateway</button>
-          <button className="secondary light" onClick={() => actions.navigate("/teacher-login")}>Teacher gateway</button>
-        </div>
-      </div>
-      <div className="metric-strip">
-        <Metric label="Live questions" value={liveQuestions} />
-        <Metric label="Published tests" value={state.tests.length} />
-        <Metric label="Student attempts" value={state.attempts.length} />
-        <Metric label="Runtime" value={firebaseLabel} />
-      </div>
-      <div className="gateway-grid">
-        <button className="gateway-card student-gateway" onClick={() => actions.navigate("/student-login")}>
-          <span className="pill">Student gateway</span>
-          <h2>Take NDA mocks and review analytics.</h2>
-          <p>Self-sign up for free public tests, continue attempts, submit timed mocks and review released results.</p>
-        </button>
-        <button className="gateway-card teacher-gateway" onClick={() => actions.navigate("/teacher-login")}>
-          <span className="pill">Teacher gateway</span>
-          <h2>Import, edit and publish question-bank content.</h2>
-          <p>Teacher accounts enter as pending until admin approval, then get subject-bank publishing access.</p>
-        </button>
-      </div>
-      <section className="section-panel">
-        <div>
-          <p className="eyebrow">Launch scope</p>
-          <h2>NDA first, multi-exam shell ready.</h2>
-        </div>
-        <p>
-          Defence Sprouts content now sits under NDA resources. The app structure is ready for NEET,
-          JEE Main and JEE Advanced once their question banks are added.
-        </p>
+    <>
+      <section className="landing site-landing">
+        <section className="site-hero" aria-labelledby="hero-title">
+          <div className="site-hero-intro">
+            <span className="site-stamp-badge">For coaching centres</span>
+            <h1 id="hero-title">Know every class. Know every score.</h1>
+            <p className="site-hero-copy">
+              Ledgr Classes keeps your centre organised with two simple tools: ClassLog for daily teaching,
+              and Mock Tests for student practice.
+            </p>
+            <div className="site-hero-actions">
+              <button className="site-button site-button-primary" type="button" onClick={actions.openDemo}>Book a demo</button>
+              <a className="site-button site-button-outline" href="#products">See how it works</a>
+            </div>
+            <p className="site-hero-note">Built for centres running NDA, JEE, NEET and board-exam batches.</p>
+          </div>
+
+          <div className="site-register-card" aria-label="Sample daily register">
+            <div className="site-register-head">
+              <strong>Today's register</strong>
+              <span>{registerDate}</span>
+            </div>
+            <div className="site-register-rows">
+              <div className="site-register-row">
+                <span><strong>Physics</strong><small>Batch 9B</small></span>
+                <span className="site-reg-status done">Logged</span>
+              </div>
+              <div className="site-register-row">
+                <span><strong>Chemistry</strong><small>Batch 11A</small></span>
+                <span className="site-reg-status pending">Pending</span>
+              </div>
+              <div className="site-register-row">
+                <span><strong>Mock Test</strong><small>{publishedQuestions || "NDA"} questions</small></span>
+                <span className="site-reg-status score">68% avg</span>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <section id="products" className="site-section" aria-labelledby="products-title">
+          <div className="site-section-head">
+            <span className="site-stamp-badge">Two products</span>
+            <h2 id="products-title">Built for two different jobs.</h2>
+            <p>Teachers and admins run the day. Students run the test.</p>
+          </div>
+
+          <div className="site-product-grid">
+            <article className="site-product-card classlog">
+              <span className="site-stamp-badge blue">For teachers & admins</span>
+              <h3>ClassLog</h3>
+              <p>A daily register for class work: what was taught, who logged it, and what still needs attention.</p>
+              <ul className="site-product-bullets">
+                <li>Teachers log each class in under a minute</li>
+                <li>Admins see pending and cold classes at a glance</li>
+                <li>Directors get review-ready reports</li>
+              </ul>
+            </article>
+
+            <article className="site-product-card mocktest">
+              <span className="site-stamp-badge red">For students</span>
+              <h3>Mock Tests</h3>
+              <p>Timed practice tests that plug into your syllabus, with results ready to review.</p>
+              <ul className="site-product-bullets">
+                <li>Students attempt tests and see results</li>
+                <li>Teachers import and manage questions</li>
+                <li>Admins publish tests and control access</li>
+              </ul>
+            </article>
+          </div>
+        </section>
+
+        <section className="site-section" aria-labelledby="demo-title">
+          <div className="site-cta-band">
+            <div>
+              <h2 id="demo-title">See it running in your centre.</h2>
+              <p>We'll set up ClassLog, Mock Tests, or both. No pressure, just a walkthrough.</p>
+            </div>
+            <button className="site-button site-button-primary" type="button" onClick={actions.openDemo}>Book a demo</button>
+          </div>
+        </section>
+
+        <footer className="site-footer">
+          <div className="site-footer-brand">
+            <span className="site-brand-mark small">L</span>
+            <span>Ledgr Classes: class logs and mock tests for coaching centres.</span>
+          </div>
+          <div className="site-footer-links">
+            <a href="https://teacher.ledgrclasses.com/">ClassLog login</a>
+            <button type="button" onClick={() => actions.navigate("/student-login")}>Mock Test login</button>
+          </div>
+        </footer>
       </section>
-    </section>
+
+      <div
+        className={`site-modal ${demoOpen ? "open" : ""}`}
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="demoModalTitle"
+        aria-hidden={!demoOpen}
+        onPointerDown={(event) => {
+          if (event.target === event.currentTarget) actions.closeDemo();
+        }}
+      >
+        <div className="site-modal-panel">
+          <div className="site-modal-head">
+            <div>
+              <h2 id="demoModalTitle">Book a Ledgr demo</h2>
+              <p>Tell us the basics. We'll respond with the right setup path for your institute.</p>
+            </div>
+            <button className="site-close-button" type="button" aria-label="Close demo form" onClick={actions.closeDemo}>x</button>
+          </div>
+
+          <form className="site-lead-form" onSubmit={submitLead} noValidate>
+            <div className="site-field">
+              <label htmlFor="leadName">Name</label>
+              <input id="leadName" name="name" autoComplete="name" value={leadForm.name} onChange={(event) => updateLeadForm("name", event.target.value)} required />
+            </div>
+            <div className="site-field">
+              <label htmlFor="leadPhone">Phone</label>
+              <input id="leadPhone" name="phone" autoComplete="tel" value={leadForm.phone} onChange={(event) => updateLeadForm("phone", event.target.value)} required />
+            </div>
+            <div className="site-field">
+              <label htmlFor="leadInstitute">Institute name</label>
+              <input id="leadInstitute" name="instituteName" autoComplete="organization" value={leadForm.instituteName} onChange={(event) => updateLeadForm("instituteName", event.target.value)} required />
+            </div>
+            <div className="site-field">
+              <label htmlFor="leadMessage">Message</label>
+              <textarea
+                id="leadMessage"
+                name="message"
+                placeholder="Optional: city, number of teachers, or whether you want ClassLog, Mock Tests, or both."
+                value={leadForm.message}
+                onChange={(event) => updateLeadForm("message", event.target.value)}
+              />
+            </div>
+            <div className="site-hidden-field" aria-hidden="true">
+              <label htmlFor="leadWebsite">Website</label>
+              <input id="leadWebsite" name="website" tabIndex="-1" autoComplete="off" value={leadForm.website} onChange={(event) => updateLeadForm("website", event.target.value)} />
+            </div>
+            <div className="site-form-actions">
+              <button className="site-button site-button-primary" type="submit">Send request</button>
+              <p className={`site-form-status ${formStatus.tone}`} role="status" aria-live="polite">{formStatus.message}</p>
+            </div>
+          </form>
+        </div>
+      </div>
+    </>
   );
 }
 
